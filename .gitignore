@@ -31,3 +31,5 @@ samples/
 *.tif
 *.tiff
 output/
+native/agi-desktop/agi-desktop
+native/AGI.app/
