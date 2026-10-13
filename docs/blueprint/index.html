@@ -1526,12 +1526,52 @@ function drawBoards() {
 
   let h = `
     <!-- 상단 5개 보드 바로가기 내비게이션 -->
-    <div style="display:flex; gap:8px; margin:8px 0 24px; flex-wrap:wrap">
+    <div style="display:flex; gap:8px; margin:8px 0 20px; flex-wrap:wrap">
       <a class="btn on" href="#bbar-1" style="text-decoration:none">보드 1 · 3D 모델 작업 (1호 주거지)</a>
       <a class="btn" href="#bbar-2" style="text-decoration:none">보드 2 · 홈 화면 (조사 관리 · 작업 순서)</a>
       <a class="btn" href="#bbar-3" style="text-decoration:none">보드 3 · 토층 단면도 (A-A') 및 등고선</a>
       <a class="btn" href="#bbar-4" style="text-decoration:none">보드 4 · 대화창 모음 (새 조사 · 타깃 · 카메라)</a>
       <a class="btn" href="#bbar-5" style="text-decoration:none">보드 5 · 국가유산청 검수 및 제출 꾸러미</a>
+    </div>
+
+    <!-- 완성 그래픽 렌더 갤러리 (High-Resolution UI Renders) -->
+    <div style="background:var(--wash); border:1px solid var(--line); border-radius:12px; padding:20px 24px; margin-bottom:32px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div>
+          <span class="secno" style="color:var(--action); font-weight:700;">VISUAL FIDELITY · 조용한 도판 완성 렌더링</span>
+          <h3 style="margin:2px 0 4px; font-size:18px;">AGI 고고학 3D 사진측량 &amp; 실측 도면화 실제 UI 그래픽</h3>
+          <p class="muted" style="margin:0; font-size:12px;">단일 행 리본 툴바(One-Row Ribbon)와 현장 채광 가독성 토큰(#FFFFFF / #F4F6F8 / #0B3A63)이 완벽히 적용된 상용급 고해상도 인터페이스 렌더링입니다.</p>
+        </div>
+        <span class="seg sm">
+          <span style="font-size:11px; padding:4px 8px; background:var(--surface); border:1px solid var(--edge); border-radius:6px; color:var(--nextText); font-weight:600;">Full 4K Ultra-Crisp</span>
+        </span>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+        <div style="background:var(--surface); border:1px solid var(--edge); border-radius:8px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+          <div style="padding:10px 14px; background:var(--ground); border-bottom:1px solid var(--line); font-size:12px; font-weight:600; display:flex; justify-content:space-between;">
+            <span>[렌더 1] 3D 트렌치 현장 복원 &amp; 광속조정 뷰 (Trench 3D Photogrammetry)</span>
+            <span class="mono muted">60 FPS · EPSG:5186</span>
+          </div>
+          <a href="assets/trench_3d_photogrammetry_ui.jpg" target="_blank" title="클릭하여 원본 해상도로 보기">
+            <img src="assets/trench_3d_photogrammetry_ui.jpg" alt="AGI 3D Photogrammetry UI Render" style="width:100%; display:block; border:0; aspect-ratio:16/10; object-fit:cover;">
+          </a>
+          <div style="padding:8px 14px; font-size:11px; color:var(--muted); line-height:16px;">
+            고밀도 점군(8.4M), 드론 카메라 자세 피라미드, 14비트 원형 코드 타깃(GCP), 1.000m 스케일바 검측 오차(±0.2mm)
+          </div>
+        </div>
+        <div style="background:var(--surface); border:1px solid var(--edge); border-radius:8px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+          <div style="padding:10px 14px; background:var(--ground); border-bottom:1px solid var(--line); font-size:12px; font-weight:600; display:flex; justify-content:space-between;">
+            <span>[렌더 2] 토층 단면도(A-A') 실측 &amp; 10cm 등고선 CAD 뷰</span>
+            <span class="mono muted">AutoCAD DXF · EL. 35.0m</span>
+          </div>
+          <a href="assets/archaeological_stratigraphy_cad_view.jpg" target="_blank" title="클릭하여 원본 해상도로 보기">
+            <img src="assets/archaeological_stratigraphy_cad_view.jpg" alt="Archaeological Stratigraphy & CAD View" style="width:100%; display:block; border:0; aspect-ratio:16/10; object-fit:cover;">
+          </a>
+          <div style="padding:8px 14px; font-size:11px; color:var(--muted); line-height:16px;">
+            평면 정사영상 A-A' 절단선(±5cm 버퍼), 층위별 해칭(표토·매몰토·생토암반), 표고 기준선(EL. 35.0m), 10cm 주곡선/계곡선
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
