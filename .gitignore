@@ -30,3 +30,4 @@ samples/
 *.laz
 *.tif
 *.tiff
+output/

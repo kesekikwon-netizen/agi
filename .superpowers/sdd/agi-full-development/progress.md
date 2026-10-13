@@ -5,6 +5,6 @@
 - [x] Task 2: `agi-sfm` (Epipolar Geometry, Triangulation, Incremental SfM, and Bundle Adjustment with GCP/Scalebar) [commit 6778f99]
 - [x] Task 3: `agi-mvs` & `agi-mesh` (PatchMatch Depth Estimation, Dense Point Cloud, 3D Mesh Reconstruction) [commit 6c54f6b]
 - [x] Task 4: `agi-ortho` (Plan Orthophoto, Vertical Soil Stratigraphy Profile Slicing A-A', 10cm Contours) [commit 1f65569]
-- [ ] Task 5: `agi-export` (AutoCAD DXF Exporter, GeoTIFF, and National Heritage Submission Package Generator)
+- [x] Task 5: `agi-export` (AutoCAD DXF Exporter, GeoTIFF, and National Heritage Submission Package Generator) [commit fa27443]
 - [ ] Task 6: `agi-cli` Integration & End-to-End Pipeline Verification with Sample Archaeological Dataset
 - [ ] Task 7: Design System Validation & Strata Visual Consistency Verification
