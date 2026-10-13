@@ -104,44 +104,45 @@ impl TargetDetector {
                             }
                         }
 
-                            // Decode circular bits on the code ring (approx radius 28px)
-                            let n_bits = self.format.bit_count();
-                            let sample_radius = 28.0;
-                            let mut bits = 0u32;
+                        // Decode circular bits on the code ring (approx radius 28px)
+                        let n_bits = self.format.bit_count();
+                        let sample_radius = 28.0;
+                        let mut bits = 0u32;
 
-                            for i in 0..n_bits {
-                                let theta = (i as f64 + 0.5) * (2.0 * std::f64::consts::PI / n_bits as f64);
-                                let sx = (sub_x + sample_radius * theta.cos()).round() as usize;
-                                let sy = (sub_y + sample_radius * theta.sin()).round() as usize;
+                        for i in 0..n_bits {
+                            let theta =
+                                (i as f64 + 0.5) * (2.0 * std::f64::consts::PI / n_bits as f64);
+                            let sx = (sub_x + sample_radius * theta.cos()).round() as usize;
+                            let sy = (sub_y + sample_radius * theta.sin()).round() as usize;
 
-                                if sx < width && sy < height {
-                                    let bit_val = image[sy * width + sx];
-                                    if bit_val < 128 {
-                                        bits |= 1 << i;
-                                    }
+                            if sx < width && sy < height {
+                                let bit_val = image[sy * width + sx];
+                                if bit_val < 128 {
+                                    bits |= 1 << i;
                                 }
                             }
+                        }
 
-                            // Avoid duplicate detections
-                            let already_detected = detected.iter().any(|t: &CodedTarget| {
-                                let dx = t.center.x - sub_x;
-                                let dy = t.center.y - sub_y;
-                                (dx * dx + dy * dy).sqrt() < 10.0
+                        // Avoid duplicate detections
+                        let already_detected = detected.iter().any(|t: &CodedTarget| {
+                            let dx = t.center.x - sub_x;
+                            let dy = t.center.y - sub_y;
+                            (dx * dx + dy * dy).sqrt() < 10.0
+                        });
+
+                        if !already_detected {
+                            detected.push(CodedTarget {
+                                id: bits,
+                                center: Point2D::new(sub_x, sub_y),
+                                radius: 16.0,
+                                confidence: 0.98,
+                                format: self.format,
                             });
-
-                            if !already_detected {
-                                detected.push(CodedTarget {
-                                    id: bits,
-                                    center: Point2D::new(sub_x, sub_y),
-                                    radius: 16.0,
-                                    confidence: 0.98,
-                                    format: self.format,
-                                });
-                            }
                         }
                     }
                 }
             }
+        }
 
         detected
     }

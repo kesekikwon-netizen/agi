@@ -3,6 +3,7 @@ members = [
     "crates/agi-core",
     "crates/agi-features",
     "crates/agi-sfm",
+    "crates/agi-mvs",
     "crates/agi-cli",
 ]
 resolver = "2"

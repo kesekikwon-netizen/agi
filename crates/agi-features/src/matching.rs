@@ -138,7 +138,12 @@ impl RansacFundamental {
     }
 
     /// Computes Fundamental Matrix from 8 point correspondences with normalization.
-    fn compute_8point(&self, pts1: &[Point2D], pts2: &[Point2D], indices: &[usize]) -> Option<Matrix3<f64>> {
+    fn compute_8point(
+        &self,
+        pts1: &[Point2D],
+        pts2: &[Point2D],
+        indices: &[usize],
+    ) -> Option<Matrix3<f64>> {
         // Build equation system A * f = 0 (size 8x9)
         let mut a = nalgebra::DMatrix::<f64>::zeros(indices.len(), 9);
 
@@ -167,9 +172,8 @@ impl RansacFundamental {
         let f_vec = v_t.row(8);
 
         let mut f = Matrix3::new(
-            f_vec[0], f_vec[1], f_vec[2],
-            f_vec[3], f_vec[4], f_vec[5],
-            f_vec[6], f_vec[7], f_vec[8],
+            f_vec[0], f_vec[1], f_vec[2], f_vec[3], f_vec[4], f_vec[5], f_vec[6], f_vec[7],
+            f_vec[8],
         );
 
         // Enforce rank-2 constraint: SVD on F and set lowest singular value to 0

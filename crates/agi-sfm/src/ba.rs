@@ -123,7 +123,8 @@ impl BundleAdjuster {
                                 let jx = (pred_pert.x - pred.x) / eps;
                                 let jy = (pred_pert.y - pred.y) / eps;
 
-                                jtj[(cam_offset + dim, cam_offset + dim)] += weight * (jx * jx + jy * jy);
+                                jtj[(cam_offset + dim, cam_offset + dim)] +=
+                                    weight * (jx * jx + jy * jy);
                                 jtr[cam_offset + dim] += weight * (jx * rx + jy * ry);
                             }
                         }
@@ -183,19 +184,19 @@ impl BundleAdjuster {
             // Solve normal equations: J^T J * delta = -J^T r
             if let Some(delta) = jtj.cholesky().map(|chol| chol.solve(&(-&jtr))) {
                 // Apply update
-                for c_idx in 1..n_cams {
+                for (c_idx, pose) in poses.iter_mut().enumerate().take(n_cams).skip(1) {
                     let off = (c_idx - 1) * 6;
-                    poses[c_idx].position.x += delta[off];
-                    poses[c_idx].position.y += delta[off + 1];
-                    poses[c_idx].position.z += delta[off + 2];
+                    pose.position.x += delta[off];
+                    pose.position.y += delta[off + 1];
+                    pose.position.z += delta[off + 2];
                 }
 
                 let pt_start = (n_cams - 1) * 6;
-                for p_idx in 0..n_pts {
+                for (p_idx, pt) in points.iter_mut().enumerate().take(n_pts) {
                     let off = pt_start + p_idx * 3;
-                    points[p_idx].x += delta[off];
-                    points[p_idx].y += delta[off + 1];
-                    points[p_idx].z += delta[off + 2];
+                    pt.x += delta[off];
+                    pt.y += delta[off + 1];
+                    pt.z += delta[off + 2];
                 }
 
                 let current_rms = self.compute_reprojection_rms(poses, points, &observations);

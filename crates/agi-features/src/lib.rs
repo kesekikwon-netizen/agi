@@ -65,7 +65,9 @@ mod tests {
         pts2.push(Point2D::new(300.0, 80.0));
 
         let ransac = RansacFundamental::new(2.0, 1000);
-        let result = ransac.estimate(&pts1, &pts2).expect("RANSAC should find fundamental matrix");
+        let result = ransac
+            .estimate(&pts1, &pts2)
+            .expect("RANSAC should find fundamental matrix");
 
         // Outliers should be rejected, inliers >= 28
         assert!(result.inliers.len() >= 28);
@@ -77,13 +79,13 @@ mod tests {
     fn test_circular_coded_target_detection() {
         // Archaeological 14-bit target specification
         let detector = TargetDetector::new(TargetFormat::Circular14Bit);
-        
+
         // Synthetic image patch with target centered at (100.4, 100.6)
         let (width, height) = (200, 200);
         let center_x = 100.4;
         let center_y = 100.6;
         let mut image_data = vec![240u8; width * height]; // light background
-        
+
         // Render target concentric circles: black center bullseye radius 15
         for y in 0..height {
             for x in 0..width {
@@ -97,7 +99,11 @@ mod tests {
                 } else if dist > 24.0 && dist <= 38.0 {
                     // Coded bit segments
                     let angle = dy.atan2(dx);
-                    let norm_angle = if angle < 0.0 { angle + 2.0 * std::f64::consts::PI } else { angle };
+                    let norm_angle = if angle < 0.0 {
+                        angle + 2.0 * std::f64::consts::PI
+                    } else {
+                        angle
+                    };
                     let bit_idx = (norm_angle / (2.0 * std::f64::consts::PI) * 14.0) as usize;
                     // Target code with alternating pattern
                     if (bit_idx % 2) == 0 {
@@ -110,10 +116,22 @@ mod tests {
         }
 
         let detected = detector.detect(&image_data, width, height);
-        assert!(!detected.is_empty(), "Should detect the 14-bit coded target");
+        assert!(
+            !detected.is_empty(),
+            "Should detect the 14-bit coded target"
+        );
         let target = &detected[0];
-        println!("Detected target center: ({}, {}), expected: ({}, {})", target.center.x, target.center.y, center_x, center_y);
-        assert!((target.center.x - center_x).abs() < 0.5, "Subpixel center X should match");
-        assert!((target.center.y - center_y).abs() < 0.5, "Subpixel center Y should match");
+        println!(
+            "Detected target center: ({}, {}), expected: ({}, {})",
+            target.center.x, target.center.y, center_x, center_y
+        );
+        assert!(
+            (target.center.x - center_x).abs() < 0.5,
+            "Subpixel center X should match"
+        );
+        assert!(
+            (target.center.y - center_y).abs() < 0.5,
+            "Subpixel center Y should match"
+        );
     }
 }

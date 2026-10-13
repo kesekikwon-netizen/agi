@@ -12,6 +12,12 @@ pub struct IncrementalSfm {
     pub reprojection_threshold: f64,
 }
 
+impl Default for IncrementalSfm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IncrementalSfm {
     pub fn new() -> Self {
         Self {
@@ -47,14 +53,28 @@ impl IncrementalSfm {
         let (init_c1, init_c2) = best_pair?;
         let matches = &pairwise_matches[&(init_c1, init_c2)];
 
-        let pts1: Vec<Point2D> = matches.iter().map(|m| keypoints_per_cam[init_c1][m.query_idx]).collect();
-        let pts2: Vec<Point2D> = matches.iter().map(|m| keypoints_per_cam[init_c2][m.train_idx]).collect();
+        let pts1: Vec<Point2D> = matches
+            .iter()
+            .map(|m| keypoints_per_cam[init_c1][m.query_idx])
+            .collect();
+        let pts2: Vec<Point2D> = matches
+            .iter()
+            .map(|m| keypoints_per_cam[init_c2][m.train_idx])
+            .collect();
 
         // 2. Initialize two camera poses
-        let mut pose1 = CameraPose::new(format!("cam_{}", init_c1), &file_paths[init_c1], cameras[init_c1].clone());
+        let mut pose1 = CameraPose::new(
+            format!("cam_{}", init_c1),
+            &file_paths[init_c1],
+            cameras[init_c1].clone(),
+        );
         pose1.is_aligned = true;
 
-        let mut pose2 = CameraPose::new(format!("cam_{}", init_c2), &file_paths[init_c2], cameras[init_c2].clone());
+        let mut pose2 = CameraPose::new(
+            format!("cam_{}", init_c2),
+            &file_paths[init_c2],
+            cameras[init_c2].clone(),
+        );
         pose2.position = Point3D::new(1.0, 0.0, 0.0);
         pose2.is_aligned = true;
 
@@ -86,7 +106,8 @@ impl IncrementalSfm {
             } else if idx == init_c2 {
                 scene_cameras.push(pose2.clone());
             } else {
-                let mut unaligned = CameraPose::new(format!("cam_{}", idx), &file_paths[idx], cam.clone());
+                let mut unaligned =
+                    CameraPose::new(format!("cam_{}", idx), &file_paths[idx], cam.clone());
                 unaligned.position = Point3D::new((idx as f64) * 0.8, 0.0, 0.0);
                 unaligned.is_aligned = true;
                 scene_cameras.push(unaligned);

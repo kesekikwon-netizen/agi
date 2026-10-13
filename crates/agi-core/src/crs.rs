@@ -85,7 +85,12 @@ impl CoordinateSystem {
     }
 
     /// Transforms a point from this CRS to another CRS.
-    pub fn transform_to(&self, target: CoordinateSystem, easting: f64, northing: f64) -> Result<(f64, f64)> {
+    pub fn transform_to(
+        &self,
+        target: CoordinateSystem,
+        easting: f64,
+        northing: f64,
+    ) -> Result<(f64, f64)> {
         if *self == target {
             return Ok((easting, northing));
         }
@@ -157,7 +162,10 @@ fn tm_forward(
     let a6 = a3 * a3;
 
     let easting = false_e
-        + k0 * n * (aa + (1.0 - t + c) * a3 / 6.0 + (5.0 - 18.0 * t + t * t + 72.0 * c - 58.0 * ep2) * a5 / 120.0);
+        + k0 * n
+            * (aa
+                + (1.0 - t + c) * a3 / 6.0
+                + (5.0 - 18.0 * t + t * t + 72.0 * c - 58.0 * ep2) * a5 / 120.0);
 
     let northing = false_n
         + k0 * (m - m0
@@ -222,13 +230,15 @@ fn tm_inverse(
 
     let lat = phi1
         - (n1 * tan_phi1 / r1)
-            * (d2 / 2.0
-                - (5.0 + 3.0 * t1 + 10.0 * c1 - 4.0 * c1 * c1 - 9.0 * ep2) * d4 / 24.0
-                + (61.0 + 90.0 * t1 + 298.0 * c1 + 45.0 * t1 * t1 - 252.0 * ep2 - 3.0 * c1 * c1) * d6 / 720.0);
+            * (d2 / 2.0 - (5.0 + 3.0 * t1 + 10.0 * c1 - 4.0 * c1 * c1 - 9.0 * ep2) * d4 / 24.0
+                + (61.0 + 90.0 * t1 + 298.0 * c1 + 45.0 * t1 * t1 - 252.0 * ep2 - 3.0 * c1 * c1)
+                    * d6
+                    / 720.0);
 
     let lon = lon0
         + (d - (1.0 + 2.0 * t1 + c1) * d3 / 6.0
-            + (5.0 - 2.0 * c1 + 28.0 * t1 - 3.0 * c1 * c1 + 8.0 * ep2 + 24.0 * t1 * t1) * d5 / 120.0)
+            + (5.0 - 2.0 * c1 + 28.0 * t1 - 3.0 * c1 * c1 + 8.0 * ep2 + 24.0 * t1 * t1) * d5
+                / 120.0)
             / cos_phi1;
 
     Ok((lat.to_degrees(), lon.to_degrees()))

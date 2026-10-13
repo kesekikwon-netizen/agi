@@ -85,10 +85,22 @@ impl FeatureDetector {
 
         // FAST-9 circle offsets (radius 3, 16 pixels circumference)
         let offsets: [(isize, isize); 16] = [
-            (0, -3), (1, -3), (2, -2), (3, -1),
-            (3, 0), (3, 1), (2, 2), (1, 3),
-            (0, 3), (-1, 3), (-2, 2), (-3, 1),
-            (-3, 0), (-3, -1), (-2, -2), (-1, -3)
+            (0, -3),
+            (1, -3),
+            (2, -2),
+            (3, -1),
+            (3, 0),
+            (3, 1),
+            (2, 2),
+            (1, 3),
+            (0, 3),
+            (-1, 3),
+            (-2, 2),
+            (-3, 1),
+            (-3, 0),
+            (-3, -1),
+            (-2, -2),
+            (-1, -3),
         ];
 
         let thresh = self.threshold as i16;
@@ -104,9 +116,14 @@ impl FeatureDetector {
                 let mut count_dark = 0;
                 for &idx in &[0, 4, 8, 12] {
                     let (dx, dy) = offsets[idx];
-                    let p = image[((y as isize + dy) as usize) * width + (x as isize + dx) as usize] as i16;
-                    if p > high_thresh { count_bright += 1; }
-                    if p < low_thresh { count_dark += 1; }
+                    let p = image[((y as isize + dy) as usize) * width + (x as isize + dx) as usize]
+                        as i16;
+                    if p > high_thresh {
+                        count_bright += 1;
+                    }
+                    if p < low_thresh {
+                        count_dark += 1;
+                    }
                 }
 
                 if count_bright < 3 && count_dark < 3 {
@@ -117,7 +134,9 @@ impl FeatureDetector {
                 let mut circle = [0i16; 16];
                 for i in 0..16 {
                     let (dx, dy) = offsets[i];
-                    circle[i] = image[((y as isize + dy) as usize) * width + (x as isize + dx) as usize] as i16;
+                    circle[i] = image
+                        [((y as isize + dy) as usize) * width + (x as isize + dx) as usize]
+                        as i16;
                 }
 
                 let is_corner = (0..16).any(|start| {
@@ -127,7 +146,8 @@ impl FeatureDetector {
                 });
 
                 if is_corner {
-                    let response = circle.iter().map(|&p| (p - center_val).abs()).sum::<i16>() as f64;
+                    let response =
+                        circle.iter().map(|&p| (p - center_val).abs()).sum::<i16>() as f64;
                     keypoints.push(Keypoint::new(x as f64, y as f64, response));
                 }
             }

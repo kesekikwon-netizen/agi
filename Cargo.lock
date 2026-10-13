@@ -41,6 +41,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "agi-mvs"
+version = "0.1.0"
+dependencies = [
+ "agi-core",
+ "agi-sfm",
+ "approx",
+ "log",
+ "nalgebra",
+ "rayon",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "agi-sfm"
 version = "0.1.0"
 dependencies = [

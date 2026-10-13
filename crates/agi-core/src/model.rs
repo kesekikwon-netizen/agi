@@ -32,6 +32,11 @@ impl CameraPose {
         self.rotation.inverse_transform_vector(&diff).into()
     }
 
+    /// Transforms a point from camera coordinates to world coordinates.
+    pub fn camera_to_world(&self, pt_cam: &Point3D) -> Point3D {
+        self.position + self.rotation.transform_vector(&pt_cam.coords)
+    }
+
     /// Projects a 3D world coordinate into this camera's 2D image pixel.
     pub fn project_world_point(&self, pt_world: &Point3D) -> crate::error::Result<Point2D> {
         let pt_cam = self.world_to_camera(pt_world);

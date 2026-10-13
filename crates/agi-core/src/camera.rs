@@ -62,8 +62,12 @@ impl PinholeCamera {
         let r6 = r4 * r2;
         let radial = 1.0 + self.k1 * r2 + self.k2 * r4 + self.k3 * r6;
 
-        let x_dist = x_norm * radial + 2.0 * self.p1 * x_norm * y_norm + self.p2 * (r2 + 2.0 * x_norm * x_norm);
-        let y_dist = y_norm * radial + self.p1 * (r2 + 2.0 * y_norm * y_norm) + 2.0 * self.p2 * x_norm * y_norm;
+        let x_dist = x_norm * radial
+            + 2.0 * self.p1 * x_norm * y_norm
+            + self.p2 * (r2 + 2.0 * x_norm * x_norm);
+        let y_dist = y_norm * radial
+            + self.p1 * (r2 + 2.0 * y_norm * y_norm)
+            + 2.0 * self.p2 * x_norm * y_norm;
 
         // Convert to pixel coordinates
         let u = self.fx * x_dist + self.cx;
@@ -84,7 +88,10 @@ impl PinholeCamera {
 
     /// Checks if a 2D pixel coordinate lies within the image sensor bounds.
     pub fn is_in_frame(&self, pixel: &Point2D) -> bool {
-        pixel.x >= 0.0 && pixel.x < self.width as f64 && pixel.y >= 0.0 && pixel.y < self.height as f64
+        pixel.x >= 0.0
+            && pixel.x < self.width as f64
+            && pixel.y >= 0.0
+            && pixel.y < self.height as f64
     }
 }
 

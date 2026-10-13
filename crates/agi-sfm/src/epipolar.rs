@@ -25,9 +25,7 @@ impl EssentialMatrix {
 
         // Skew-symmetric cross product matrix [t]_x
         let tx = Matrix3::new(
-            0.0, -t_cam2.z, t_cam2.y,
-            t_cam2.z, 0.0, -t_cam2.x,
-            -t_cam2.y, t_cam2.x, 0.0,
+            0.0, -t_cam2.z, t_cam2.y, t_cam2.z, 0.0, -t_cam2.x, -t_cam2.y, t_cam2.x, 0.0,
         );
 
         let e = tx * r_rel;
@@ -47,11 +45,7 @@ pub fn decompose_essential(
     let v_t = svd.v_t?;
 
     // Hartley-Zisserman W matrix
-    let w = Matrix3::new(
-        0.0, -1.0, 0.0,
-        1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0,
-    );
+    let w = Matrix3::new(0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
 
     let mut r1 = u * w * v_t;
     if r1.determinant() < 0.0 {
@@ -67,26 +61,25 @@ pub fn decompose_essential(
     let t_neg = -t_pos;
 
     // 4 Hypotheses
-    let hypotheses = [
-        (r1, t_pos),
-        (r1, t_neg),
-        (r2, t_pos),
-        (r2, t_neg),
-    ];
+    let hypotheses = [(r1, t_pos), (r1, t_neg), (r2, t_pos), (r2, t_neg)];
 
     let pose1 = CameraPose::new("cam1", "img1.jpg", camera.clone());
     let mut best_count = 0;
     let mut best_hypothesis = None;
 
     for (rot_mat, t_vec) in hypotheses {
-        let quat = UnitQuaternion::from_rotation_matrix(&nalgebra::Rotation3::from_matrix_unchecked(rot_mat));
+        let quat = UnitQuaternion::from_rotation_matrix(
+            &nalgebra::Rotation3::from_matrix_unchecked(rot_mat),
+        );
         let mut pose2 = CameraPose::new("cam2", "img2.jpg", camera.clone());
         pose2.rotation = quat;
         pose2.position = Point3D::from(t_vec);
 
         let mut positive_depth_count = 0;
         for (p1, p2) in pts1.iter().zip(pts2.iter()) {
-            if let Some(pt3d) = crate::triangulation::triangulate_dlt(camera, &pose1, p1, camera, &pose2, p2) {
+            if let Some(pt3d) =
+                crate::triangulation::triangulate_dlt(camera, &pose1, p1, camera, &pose2, p2)
+            {
                 let pt_cam1 = pose1.world_to_camera(&pt3d);
                 let pt_cam2 = pose2.world_to_camera(&pt3d);
                 if pt_cam1.z > 0.0 && pt_cam2.z > 0.0 {

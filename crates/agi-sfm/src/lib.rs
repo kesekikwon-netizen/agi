@@ -11,7 +11,9 @@ pub use triangulation::triangulate_dlt;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agi_core::{CameraPose, CoordinateSystem, GroundControlPoint, PinholeCamera, Point3D, Scalebar};
+    use agi_core::{
+        CameraPose, CoordinateSystem, GroundControlPoint, PinholeCamera, Point3D, Scalebar,
+    };
     use nalgebra::UnitQuaternion;
 
     #[test]
@@ -61,11 +63,17 @@ mod tests {
 
         let rot_cam2 = recovered_rot.inverse();
         let rot_error = rot_cam2.angle_to(&rot2);
-        assert!(rot_error < 1e-4, "Recovered camera rotation must match rot2 within 1e-4 rad");
+        assert!(
+            rot_error < 1e-4,
+            "Recovered camera rotation must match rot2 within 1e-4 rad"
+        );
 
         // Translation in world frame: R * t_cam
         let t_world = rot_cam2.transform_vector(&recovered_t.coords).normalize();
-        assert!((t_world.x - 1.0).abs() < 1e-4, "World baseline along X must be 1.0");
+        assert!(
+            (t_world.x - 1.0).abs() < 1e-4,
+            "World baseline along X must be 1.0"
+        );
         assert!(t_world.y.abs() < 1e-4);
         assert!(t_world.z.abs() < 1e-4);
     }
@@ -114,15 +122,13 @@ mod tests {
 
         // 1 Scalebar between point 0 and point 5 (length known)
         let bar_len = (points_3d[0] - points_3d[5]).norm();
-        let scalebars = vec![
-            Scalebar {
-                label: "BAR-01".into(),
-                marker1_label: "GCP-01".into(),
-                marker2_label: "PT-05".into(),
-                target_distance_m: bar_len,
-                accuracy_m: 0.0005,
-            },
-        ];
+        let scalebars = vec![Scalebar {
+            label: "BAR-01".into(),
+            marker1_label: "GCP-01".into(),
+            marker2_label: "PT-05".into(),
+            target_distance_m: bar_len,
+            accuracy_m: 0.0005,
+        }];
 
         let adjuster = BundleAdjuster::new(BaOptions {
             max_iterations: 30,
@@ -136,16 +142,24 @@ mod tests {
         perturbed_poses[1].position.x += 0.02;
         perturbed_poses[2].position.x -= 0.02;
 
-        let result = adjuster.optimize(
-            &cam,
-            &mut perturbed_poses,
-            &mut points_3d,
-            &gcps,
-            &scalebars,
-        ).expect("Bundle Adjustment should converge");
+        let result = adjuster
+            .optimize(
+                &cam,
+                &mut perturbed_poses,
+                &mut points_3d,
+                &gcps,
+                &scalebars,
+            )
+            .expect("Bundle Adjustment should converge");
 
         assert!(result.iterations > 0);
-        assert!(result.final_rms_error < 0.5, "RMS reprojection error should be < 0.5 px");
-        assert!(result.gcp_rms_error < 0.005, "GCP residual error should be < 5 mm");
+        assert!(
+            result.final_rms_error < 0.5,
+            "RMS reprojection error should be < 0.5 px"
+        );
+        assert!(
+            result.gcp_rms_error < 0.005,
+            "GCP residual error should be < 5 mm"
+        );
     }
 }
