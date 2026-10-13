@@ -1,0 +1,17 @@
+[package]
+name = "agi-export"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "AutoCAD DXF exporter, GeoTIFF, and Korean National Heritage Agency submission packaging"
+
+[dependencies]
+agi-core = { path = "../agi-core" }
+agi-mvs = { path = "../agi-mvs" }
+agi-ortho = { path = "../agi-ortho" }
+nalgebra = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

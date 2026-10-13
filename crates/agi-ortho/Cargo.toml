@@ -1,0 +1,19 @@
+[package]
+name = "agi-ortho"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "High-precision archaeological orthomosaic generation, vertical stratigraphy section slicing, and contour extraction"
+
+[dependencies]
+agi-core = { path = "../agi-core" }
+agi-mvs = { path = "../agi-mvs" }
+nalgebra = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+rayon = { workspace = true }
+
+[dev-dependencies]
+approx = { workspace = true }

@@ -27,6 +27,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "agi-export"
+version = "0.1.0"
+dependencies = [
+ "agi-core",
+ "agi-mvs",
+ "agi-ortho",
+ "nalgebra",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "agi-features"
 version = "0.1.0"
 dependencies = [
@@ -52,6 +65,19 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "agi-ortho"
+version = "0.1.0"
+dependencies = [
+ "agi-core",
+ "agi-mvs",
+ "approx",
+ "nalgebra",
+ "rayon",
+ "serde",
  "thiserror",
 ]
 

@@ -4,6 +4,8 @@ members = [
     "crates/agi-features",
     "crates/agi-sfm",
     "crates/agi-mvs",
+    "crates/agi-ortho",
+    "crates/agi-export",
     "crates/agi-cli",
 ]
 resolver = "2"
