@@ -27,30 +27,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Linux build dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build g++-12
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 --slave /usr/bin/g++ g++ /usr/bin/g++-12
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Configure CMake
-        run: >
-          cmake -B build -S .
-          -DCMAKE_BUILD_TYPE=Release
-          -DBUILD_TESTING=ON
+      - name: Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
-      - name: Build
-        run: cmake --build build --config Release --parallel
+      - name: Check formatting
+        run: cargo fmt --check || true
 
-      - name: Run Tests (CTest)
-        run: ctest --test-dir build --build-config Release --output-on-failure
+      - name: Build Workspace
+        run: cargo build --workspace --verbose
 
-      - name: Run Executable Sanity Check
-        shell: bash
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            ./build/Release/agi.exe
-          else
-            ./build/agi
-          fi
+      - name: Run Unit Tests
+        run: cargo test --workspace --verbose
+
+      - name: Run Sanity Check
+        run: cargo run -p agi-cli

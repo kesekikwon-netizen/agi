@@ -1,47 +1,7 @@
-# Prerequisites
-*.d
-
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# CMake build directories & files
-build/
-cmake-build-*/
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-compile_commands.json
-CTestTestfile.cmake
-Testing/
-CMakeUserPresets.json
+# Rust Cargo build artifacts
+target/
+**/*.rs.bk
+*.pdb
 
 # macOS specific
 .DS_Store
@@ -60,13 +20,13 @@ CMakeUserPresets.json
 .idea/
 *.sublime-project
 *.sublime-workspace
-.clangd/
-.cache/
 
-# Python cache (if any scripts used)
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
-env/
-venv/
+# Sample excavation & photogrammetry data (do not commit raw gigabyte images)
+samples/
+*.gpkg
+*.agi
+*.sqlite
+*.las
+*.laz
+*.tif
+*.tiff

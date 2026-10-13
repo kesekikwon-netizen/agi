@@ -1,0 +1,23 @@
+[workspace]
+members = [
+    "crates/agi-core",
+    "crates/agi-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["kesekikwon-netizen <kesekikwon@gmail.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/kesekikwon-netizen/agi"
+
+[workspace.dependencies]
+nalgebra = { version = "0.33", features = ["serde-serialize"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+log = "0.4"
+env_logger = "0.11"
+approx = "0.5"
+rayon = "1.10"
