@@ -1,0 +1,2171 @@
+<!DOCTYPE html>
+<html lang="ko" data-look="base">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AGI 설계도 — 고고학 사진측량 · Strata 계열</title>
+<style>
+/* =====================================================================
+   토큰. 이름과 값은 Strata(mac-hgis)에서 그대로 가져왔다.
+   base  = Strata 기본 모양 (src/app/KaTheme.cpp strataTokens)
+   paper = Strata 2차 안 「조용한 도판」 (docs/design/.../tokens.json)
+   데이터 색(지도·도면 기호)은 두 모양에서 같다.
+   ===================================================================== */
+:root {
+  --ground:#FFFFFF; --surface:#FFFFFF; --wash:#F7F9FB; --desk:#F4F6F8; --press:#E1ECF7;
+  --oat:#E6F0FA; --ink:#1D2733; --ink2:#2B3742; --muted:#5B6875; --faint:#596874;
+  --line:#DCE3EA; --edge:#B8C4CF; --ring:#1A68B0; --checkEdge:#7D8A96;
+  --action:#1F6FB2; --actionHover:#185E99; --actionPressed:#12558D; --actionText:#FFFFFF;
+  --dot:#1F6FB2; --nextText:#105088;
+  --block:#B42318; --blockWash:#FBEDEA; --caution:#7A4A00; --cautionWash:#FFF4DB; --done:#256B42;
+  --mapGround:#FFFFFF; --page:#F4F6F8;
+  --tile:#E4EAED; --tileHover:#D9E2E7; --tileDisabled:#EEF1F3; --glyph:#2B4858; --tileLabel:#202830; --groupInk:#5E6670;
+  --toolTile:#E0ECF8; --toolBorder:#1A68B0; --toolGlyph:#105088;
+  --unsavedTile:#206CB0; --unsavedGlyph:#FFFFFF;
+  --chosenBg:#E3EEF8; --chosenEdge:#1F6FB2; --chosenInk:#105088;
+  --heroBg:#0B3A63; --heroInk:#FFFFFF; --heroMuted:#D5E6F5; --heroRule:transparent;
+  --tooltipBg:#FFFFFF; --tooltipInk:#1D2733;
+  --sans:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  --mono:Consolas,"SF Mono",Menlo,"Cascadia Mono","IBM Plex Mono",monospace;
+  --name:var(--sans); --nameWeight:700;
+}
+html[data-look="paper"] {
+  --ground:#FAF9F5; --surface:#FFFFFF; --wash:#F5F4ED; --desk:#F0EEE6; --press:#E8E6DC;
+  --oat:#E3DACC; --ink:#141413; --ink2:#3D3D3A; --muted:#5E5D59; --faint:#73726C;
+  --line:#DEDCD1; --edge:#C2C0B6; --ring:#B0AEA5; --checkEdge:#87867F;
+  --action:#B5573A; --actionHover:#A44D32; --actionPressed:#8F4229; --actionText:#FFFFFF;
+  --dot:#D97757; --nextText:#9C4A2F;
+  --block:#A33B3B; --blockWash:#F3DEDA; --caution:#7A5A00; --cautionWash:#F6ECC8; --done:#3F6B31;
+  --mapGround:#F7F5EE; --page:#F0EEE6;
+  --tile:#F0EEE6; --tileHover:#E8E6DC; --tileDisabled:#F5F4ED; --glyph:#30302E; --tileLabel:#141413; --groupInk:#5E5D59;
+  --toolTile:#30302E; --toolBorder:#30302E; --toolGlyph:#FAF9F5;
+  --unsavedTile:#B5573A; --unsavedGlyph:#FFFFFF;
+  --chosenBg:#E3DACC; --chosenEdge:#141413; --chosenInk:#141413;
+  --heroBg:transparent; --heroInk:#141413; --heroMuted:#5E5D59; --heroRule:#141413;
+  --tooltipBg:#141413; --tooltipInk:#FAF9F5;
+  --name:"Noto Serif KR","AppleMyungjo","Nanum Myeongjo",Batang,serif; --nameWeight:500;
+}
+
+* { box-sizing:border-box; }
+html,body { margin:0; padding:0; }
+body { background:var(--page); color:var(--ink); font:13px/20px var(--sans); word-break:keep-all; -webkit-font-smoothing:antialiased; }
+.mono { font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.muted { color:var(--muted); } .faint { color:var(--faint); }
+a { color:var(--nextText); }
+svg.g { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+
+/* ---------- 문서 틀 ---------- */
+.doc-cap { position:sticky; top:0; z-index:50; height:48px; background:var(--ground); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:16px; padding:0 24px; }
+.doc-cap .word { font-family:var(--name); font-weight:var(--nameWeight); font-size:20px; line-height:28px; }
+.doc-cap .rule { width:1px; height:20px; background:var(--edge); }
+.doc-cap .sp { flex:1; }
+.seg { display:inline-flex; }
+.seg button { height:32px; padding:0 12px; font:13px var(--sans); color:var(--ink); background:var(--surface); border:1px solid var(--edge); margin-left:-1px; cursor:pointer; }
+.seg button:first-child { border-radius:8px 0 0 8px; margin-left:0; }
+.seg button:last-child { border-radius:0 8px 8px 0; }
+.seg button.on { background:var(--chosenBg); outline:1px solid var(--chosenEdge); outline-offset:-1px; position:relative; z-index:1; color:var(--chosenInk); }
+.seg.sm button { height:24px; font-size:12px; padding:0 8px; }
+
+.layout { display:flex; align-items:flex-start; }
+.toc { position:sticky; top:48px; width:300px; height:calc(100vh - 48px); overflow:auto; background:var(--ground); border-right:1px solid var(--line); padding:16px; flex:none; }
+.toc .capline { margin-top:16px; }
+.toc a { display:flex; height:32px; align-items:center; gap:8px; padding:0 8px; color:var(--ink); text-decoration:none; border-radius:8px; }
+.toc a:hover { background:var(--wash); }
+.toc a.cur { background:var(--oat); }
+.toc a .n { font-family:var(--mono); color:var(--muted); font-size:12px; width:24px; }
+main { flex:1; min-width:0; }
+.sheet { background:var(--ground); border-bottom:1px solid var(--line); padding:48px 48px 56px; }
+.sheet > .inner { max-width:1240px; }
+.sheet.wide > .inner { max-width:none; }
+h1.display { font-family:var(--name); font-weight:var(--nameWeight); font-size:40px; line-height:48px; margin:0; }
+h2.title { font-family:var(--name); font-weight:var(--nameWeight); font-size:28px; line-height:36px; margin:0 0 8px; }
+h3.heading { font-family:var(--name); font-weight:var(--nameWeight); font-size:20px; line-height:28px; margin:32px 0 8px; }
+h4.lead { font-size:15px; line-height:24px; font-weight:400; margin:24px 0 8px; }
+p { margin:0 0 12px; max-width:44em; }
+p.lead { font-size:15px; line-height:24px; }
+.secno { font-family:var(--mono); color:var(--muted); font-size:12px; letter-spacing:0; margin-bottom:4px; }
+.capline { display:flex; align-items:center; gap:8px; font-size:11px; line-height:16px; color:var(--muted); margin:16px 0 8px; }
+.capline::after { content:""; flex:1; height:1px; background:var(--line); }
+.note { border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:8px 0; color:var(--muted); font-size:12px; line-height:18px; margin:16px 0; }
+.cols { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:24px 32px; }
+.cols.two { grid-template-columns:1fr 1fr; }
+ul.plain { margin:0 0 12px; padding-left:18px; max-width:46em; } ul.plain li { margin:2px 0; }
+ol.plain { margin:0 0 12px; padding-left:20px; max-width:46em; } ol.plain li { margin:4px 0; }
+
+/* ---------- 삼선표 ---------- */
+table.t3 { border-collapse:collapse; width:100%; border-top:1px solid var(--ink); border-bottom:1px solid var(--ink); margin:8px 0 16px; }
+table.t3 th { height:28px; font-size:11px; line-height:16px; font-weight:400; color:var(--muted); text-align:left; border-bottom:1px solid var(--line); padding:6px 12px 6px 0; vertical-align:bottom; }
+table.t3 td { padding:6px 12px 6px 0; border-top:1px solid var(--press); vertical-align:top; line-height:20px; }
+table.t3 tr:first-child td { border-top:0; }
+table.t3 .num, table.t3 th.num { text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums; }
+table.t3 tr.grp td { background:var(--wash); font-size:11px; color:var(--muted); height:28px; padding-left:8px; }
+table.t3 td.k { white-space:nowrap; font-family:var(--mono); font-size:12px; }
+table.t3.dense td { padding-top:4px; padding-bottom:4px; font-size:12px; line-height:18px; }
+
+/* ---------- 상태 표시 (표시 + 글자) ---------- */
+.dot { display:inline-block; width:6px; height:6px; border-radius:3px; background:var(--dot); vertical-align:middle; margin-right:6px; }
+.mk { display:inline-flex; align-items:center; gap:6px; font-size:12px; }
+.mk .tri { width:0; height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-bottom:10px solid var(--caution); }
+.mk.block { color:var(--block); }
+.mk .x { width:12px; height:12px; border-radius:6px; background:var(--block); color:#fff; font-size:10px; line-height:12px; text-align:center; }
+.mk .ok { color:var(--done); }
+
+/* ---------- 버튼 · 입력 ---------- */
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; height:32px; padding:0 16px; min-width:88px; border-radius:8px; border:1px solid var(--edge); background:var(--surface); color:var(--ink); font:13px var(--sans); white-space:nowrap; }
+.btn.primary { background:var(--action); border-color:var(--action); color:var(--actionText); font-weight:700; }
+.btn.primary.off { background:var(--press); border-color:var(--press); color:var(--faint); }
+.btn.quiet { border-color:transparent; background:transparent; min-width:0; padding:0 8px; }
+.btn.danger { color:var(--block); }
+.btn.s24 { height:24px; font-size:12px; padding:0 8px; min-width:0; }
+.btn.s40 { height:40px; font-size:15px; padding:0 20px; }
+.field { height:32px; border:1px solid var(--edge); border-radius:8px; background:var(--surface); padding:0 10px; display:flex; align-items:center; gap:8px; color:var(--ink); }
+.field.num { justify-content:flex-end; font-family:var(--mono); }
+.field .unit { color:var(--faint); font-family:var(--sans); font-size:12px; }
+.field.ph { color:var(--faint); }
+.check { display:inline-flex; align-items:center; gap:8px; }
+.check i { width:16px; height:16px; border-radius:4px; border:1px solid var(--checkEdge); background:var(--surface); display:inline-block; position:relative; flex:none; }
+.check i.on { background:var(--ink); border-color:var(--ink); }
+.check i.on::after { content:""; position:absolute; left:5px; top:1px; width:4px; height:9px; border:solid var(--ground); border-width:0 2px 2px 0; transform:rotate(45deg); }
+.radio i { border-radius:8px; }
+.radio i.on { background:var(--surface); border-color:var(--ink); }
+.radio i.on::after { content:""; position:absolute; left:3px; top:3px; width:8px; height:8px; border-radius:4px; background:var(--ink); border:0; transform:none; }
+.leader { display:flex; align-items:baseline; gap:8px; height:24px; }
+.leader .l { color:var(--muted); font-size:12px; white-space:nowrap; }
+.leader .d { flex:1; border-bottom:1px dotted var(--edge); transform:translateY(-4px); }
+.leader .v { font-family:var(--mono); white-space:nowrap; }
+.leader .u { color:var(--faint); font-size:12px; }
+.ledger { border-top:1px solid var(--ink); border-bottom:1px solid var(--line); }
+.ledger .row { display:flex; align-items:baseline; justify-content:space-between; height:36px; padding-top:6px; }
+.ledger .row + .row { border-top:1px solid var(--press); }
+.ledger .c { font-size:11px; color:var(--muted); }
+.ledger .f { font-family:var(--mono); font-size:20px; line-height:28px; }
+.ledger .f small { font-family:var(--sans); font-size:12px; color:var(--faint); margin-left:4px; }
+.ledger.cells { display:flex; }
+.ledger.cells .row { flex:1; flex-direction:column; justify-content:flex-start; height:auto; padding:6px 12px 8px 0; border-top:0; }
+.ledger.cells .row + .row { border-left:1px solid var(--line); padding-left:12px; }
+
+/* ---------- 종이 (도판 · 양식) ---------- */
+.paper { background:var(--surface); border:1px solid var(--ink); border-radius:0; padding:28px 32px; color:#141413; }
+.paper.onDesk { border-color:var(--edge); }
+.paper .ph { font-family:var(--name); font-weight:var(--nameWeight); font-size:20px; line-height:28px; text-align:center; margin:0 0 4px; }
+.paper .ps { text-align:center; font-size:11px; color:var(--muted); margin-bottom:12px; }
+.formgrid { display:grid; grid-template-columns:96px 1fr 96px 1fr; border-top:1px solid #141413; border-bottom:1px solid #141413; }
+.formgrid > div { padding:5px 8px; border-top:1px solid #E8E6DC; font-size:12px; min-height:28px; }
+.formgrid > .lab { color:var(--muted); font-size:11px; background:transparent; }
+.formgrid > div:nth-child(-n+4) { border-top:0; }
+.desk { background:var(--desk); padding:24px; }
+
+/* ---------- 색 견본 ---------- */
+.sw { display:grid; grid-template-columns:repeat(auto-fill,minmax(176px,1fr)); gap:12px 16px; }
+.sw .s { display:flex; gap:10px; align-items:flex-start; }
+.sw .chip { width:64px; height:40px; border-radius:4px; border:1px solid var(--line); flex:none; }
+.sw .nm { font-family:var(--mono); font-size:12px; }
+.sw .hx { font-family:var(--mono); font-size:11px; color:var(--muted); }
+.sw .cr { font-size:11px; color:var(--muted); }
+
+/* =====================================================================
+   보드 (앱 화면). 1920 × 1040 실제 크기로 그리고 폭에 맞춰 줄인다.
+   ===================================================================== */
+.boardbar { display:flex; align-items:center; gap:12px; margin:24px 0 8px; }
+.boardbar .t { font-size:15px; line-height:24px; }
+.boardbar .sp { flex:1; }
+.bwrap { width:100%; overflow:hidden; border:1px solid var(--edge); background:var(--desk); position:relative; }
+.bwrap.actual { overflow:auto; }
+.board { width:1920px; height:1040px; transform-origin:0 0; background:var(--ground); display:flex; flex-direction:column; position:relative; overflow:hidden; font:13px/20px var(--sans); color:var(--ink); }
+.board .cap { height:32px; flex:none; background:var(--ground); border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:center; position:relative; font-size:13px; color:var(--ink2); }
+.board .cap .lights { position:absolute; left:14px; top:10px; display:flex; gap:8px; }
+.board .cap .lights i { width:12px; height:12px; border-radius:6px; background:var(--edge); display:block; }
+
+/* 리본: 행 118, 칩 58 × 79, 타일 50 r12.5, 그림 28, 글자 13, 묶음 이름 11/700 */
+.ribbon { height:118px; flex:none; background:var(--ground); border-bottom:1px solid var(--line); display:flex; align-items:stretch; padding:0 12px; }
+.rgrp { display:flex; flex-direction:column; align-items:stretch; padding:8px 6px 0; }
+.rgrp + .rgrp { border-left:1px solid var(--line); }
+.rchips { display:flex; height:79px; }
+.rcap { text-align:center; font-size:11px; line-height:16px; font-weight:700; color:var(--groupInk); padding-top:4px; }
+.rcap.dim { color:var(--edge); }
+.chip { width:58px; height:79px; display:flex; flex-direction:column; align-items:center; cursor:default; position:relative; }
+.chip .tile { width:50px; height:50px; border-radius:12.5px; background:var(--tile); display:flex; align-items:center; justify-content:center; color:var(--glyph); border:3.125px solid transparent; position:relative; }
+.chip .tile svg.g { width:28px; height:28px; stroke-width:2; }
+.chip .lab { margin-top:4px; font-size:13px; line-height:18px; color:var(--tileLabel); white-space:nowrap; letter-spacing:-0.2px; }
+.chip:hover .tile { background:var(--tileHover); }
+.chip.tool .tile { background:var(--toolTile); border-color:var(--toolBorder); color:var(--toolGlyph); }
+.chip.tool .lab, .chip.unsaved .lab { font-weight:700; }
+.chip.unsaved .tile { background:var(--unsavedTile); color:var(--unsavedGlyph); }
+.chip.unsaved .tile::after { content:""; position:absolute; right:-5px; top:-5px; width:10px; height:10px; border-radius:6px; background:var(--ink); box-shadow:0 0 0 2px #FFFFFF; }
+.chip.off .tile { background:var(--tileDisabled); color:var(--glyph); }
+.chip.off .tile svg { opacity:.45; }
+.chip.off .lab { color:#696862; }
+.chip.focus .tile { outline:2px solid var(--ink); outline-offset:2px; }
+.rsearch { margin-left:auto; display:flex; align-items:center; padding-right:8px; }
+.rsearch .field { width:200px; color:var(--faint); }
+
+.vtabs { height:36px; flex:none; background:var(--ground); border-bottom:1px solid var(--line); display:flex; align-items:stretch; padding-left:8px; }
+.vtab { display:flex; align-items:center; gap:8px; padding:0 16px; color:var(--muted); position:relative; }
+.vtab.cur { color:var(--ink); }
+.vtab.cur::after { content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--ink); }
+.vtab .x { color:var(--muted); }
+.vtabs .corner { margin-left:auto; display:flex; align-items:center; padding-right:16px; gap:4px; }
+
+.subbar { height:44px; flex:none; background:var(--ground); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 16px; gap:8px; }
+.subbar .lbl { color:var(--muted); font-size:12px; margin-right:4px; }
+.tbtn { height:32px; display:inline-flex; align-items:center; gap:6px; padding:0 10px; background:var(--surface); border:1px solid var(--edge); border-radius:8px; white-space:nowrap; }
+.tbtn svg.g { width:20px; height:20px; }
+.tbtn.on { background:var(--toolTile); border-color:var(--toolBorder); color:var(--toolGlyph); }
+.tbtn.shown { background:var(--oat); border-color:var(--ring); }
+.vrule { width:1px; height:20px; background:var(--line); margin:0 12px; }
+
+.page { flex:1; display:flex; min-height:0; }
+.pnl { background:var(--ground); padding:16px; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+.split { width:7px; background:var(--ground); position:relative; flex:none; }
+.split::after { content:""; position:absolute; left:3px; top:0; bottom:0; width:1px; background:var(--line); }
+.phead { height:32px; display:flex; align-items:center; gap:4px; }
+.phead .t { flex:1; }
+.band { height:28px; display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted); margin-top:8px; }
+.band::after { content:""; flex:1; height:1px; background:var(--line); }
+.krow { height:24px; display:flex; align-items:center; gap:8px; padding:0 4px; font-size:12px; }
+.krow.sel { background:var(--oat); }
+.krow.sub { padding-left:24px; height:20px; font-size:11px; }
+.krow .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.krow .cnt { font-family:var(--mono); font-size:10px; color:var(--muted); }
+.krow .cb { width:14px; height:14px; border-radius:4px; border:1px solid var(--checkEdge); background:var(--surface); flex:none; position:relative; }
+.krow .cb.on { background:var(--ink); border-color:var(--ink); }
+.krow .cb.on::after { content:""; position:absolute; left:4px; top:1px; width:3px; height:7px; border:solid var(--ground); border-width:0 2px 2px 0; transform:rotate(45deg); }
+.krow .patch { width:20px; height:14px; border:1px solid #141413; flex:none; }
+.krow.offname .nm { color:var(--faint); }
+.center { flex:1; position:relative; background:var(--mapGround); overflow:hidden; }
+.center canvas, .center svg.art { position:absolute; inset:0; width:100%; height:100%; }
+.ov { position:absolute; background:var(--surface); border:1px solid var(--edge); border-radius:8px; box-shadow:0 2px 12px rgba(20,20,19,.12); padding:8px 12px; font-size:12px; }
+.ov .ib { width:36px; height:36px; display:flex; align-items:center; justify-content:center; }
+.ov .ib svg.g { width:20px; height:20px; }
+.ov.col { padding:0; }
+.ov.col .ib + .ib { border-top:1px solid var(--line); }
+.ov.row { padding:0; display:flex; }
+.ov.row .ib + .ib, .ov.row .seg2 + .seg2 { border-left:1px solid var(--line); }
+.guide { height:36px; display:flex; align-items:center; gap:12px; padding:0 12px; }
+.guide .vr { width:1px; height:16px; background:var(--line); }
+.status { height:32px; flex:none; background:var(--ground); border-top:1px solid var(--line); display:flex; align-items:center; padding:0 16px; font-size:12px; }
+.status .sent { color:var(--muted); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.status .cell { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.status .cell + .cell::before { content:""; width:1px; height:16px; background:var(--line); margin:0 12px 0 6px; }
+.status .xy { font-family:var(--mono); display:inline-block; width:96px; text-align:right; }
+.status .lbl { color:var(--muted); font-size:11px; }
+
+/* 보드 안의 창 */
+.dlg { position:absolute; background:var(--ground); border-radius:10px; box-shadow:0 18px 50px rgba(20,20,19,.28), 0 0 0 1px rgba(20,20,19,.12); overflow:hidden; display:flex; flex-direction:column; }
+.dlg .dcap { height:32px; background:var(--ground); border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:center; position:relative; font-size:13px; color:var(--ink2); flex:none; }
+.dlg .dcap .lights { position:absolute; left:12px; top:10px; display:flex; gap:7px; }
+.dlg .dcap .lights i { width:11px; height:11px; border-radius:6px; background:var(--edge); display:block; }
+.dlg .dbody { padding:24px; flex:1; overflow:hidden; }
+.dlg .dfoot { display:flex; align-items:center; gap:8px; padding:0 24px 24px; }
+.dlg .dfoot .sp { flex:1; }
+.dlg .frow { display:grid; grid-template-columns:96px 1fr; gap:12px; align-items:center; margin-bottom:12px; }
+.dlg .frow > .l { font-size:12px; color:var(--muted); }
+
+/* 견본 칸에 붙는 작은 머리글 */
+.spec { font-size:11px; color:var(--muted); margin-top:6px; }
+
+@media print { .doc-cap, .toc { display:none; } .sheet { break-inside:avoid; } }
+</style>
+</head>
+<body>
+<!-- 아이콘: Strata data/icons/lucide (ISC, Lucide) 그대로 + 같은 굵기·격자로 그린 AGI 그림(ka-) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-amphora" viewBox="0 0 24 24"> <path d="M10 2v5.632c0 .424-.272.795-.653.982A6 6 0 0 0 6 14c.006 4 3 7 5 8" /> <path d="M10 5H8a2 2 0 0 0 0 4h.68" /> <path d="M14 2v5.632c0 .424.272.795.652.982A6 6 0 0 1 18 14c0 4-3 7-5 8" /> <path d="M14 5h2a2 2 0 0 1 0 4h-.68" /> <path d="M18 22H6" /> <path d="M9 2h6" /> </symbol>
+<symbol id="i-box" viewBox="0 0 24 24"> <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /> <path d="m3.3 7 8.7 5 8.7-5" /> <path d="M12 22V12" /> </symbol>
+<symbol id="i-chart-line" viewBox="0 0 24 24"> <path d="M3 3v16a2 2 0 0 0 2 2h16" /> <path d="m19 9-5 5-4-4-3 3" /> </symbol>
+<symbol id="i-check" viewBox="0 0 24 24"> <path d="M20 6 9 17l-5-5" /> </symbol>
+<symbol id="i-chevron-left" viewBox="0 0 24 24"> <path d="m15 18-6-6 6-6" /> </symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"> <path d="m9 18 6-6-6-6" /> </symbol>
+<symbol id="i-circle-dot-dashed" viewBox="0 0 24 24"> <path d="M10.1 2.18a9.93 9.93 0 0 1 3.8 0" /> <path d="M17.6 3.71a9.95 9.95 0 0 1 2.69 2.7" /> <path d="M21.82 10.1a9.93 9.93 0 0 1 0 3.8" /> <path d="M20.29 17.6a9.95 9.95 0 0 1-2.7 2.69" /> <path d="M13.9 21.82a9.94 9.94 0 0 1-3.8 0" /> <path d="M6.4 20.29a9.95 9.95 0 0 1-2.69-2.7" /> <path d="M2.18 13.9a9.93 9.93 0 0 1 0-3.8" /> <path d="M3.71 6.4a9.95 9.95 0 0 1 2.7-2.69" /> <circle cx="12" cy="12" r="1" /> </symbol>
+<symbol id="i-clipboard-list" viewBox="0 0 24 24"> <rect width="8" height="4" x="8" y="2" rx="1" ry="1" /> <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /> <path d="M12 11h4" /> <path d="M12 16h4" /> <path d="M8 11h.01" /> <path d="M8 16h.01" /> </symbol>
+<symbol id="i-download" viewBox="0 0 24 24"> <path d="M12 15V3" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /> <path d="m7 10 5 5 5-5" /> </symbol>
+<symbol id="i-ellipsis" viewBox="0 0 24 24"> <circle cx="12" cy="12" r="1" /> <circle cx="19" cy="12" r="1" /> <circle cx="5" cy="12" r="1" /> </symbol>
+<symbol id="i-file-plus" viewBox="0 0 24 24"> <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M9 15h6" /> <path d="M12 18v-6" /> </symbol>
+<symbol id="i-file-text" viewBox="0 0 24 24"> <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /> </symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"> <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /> </symbol>
+<symbol id="i-grid-3x3" viewBox="0 0 24 24"> <rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M3 9h18" /> <path d="M3 15h18" /> <path d="M9 3v18" /> <path d="M15 3v18" /> </symbol>
+<symbol id="i-house" viewBox="0 0 24 24"> <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /> </symbol>
+<symbol id="i-image" viewBox="0 0 24 24"> <rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /> </symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"> <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /> </symbol>
+<symbol id="i-locate-fixed" viewBox="0 0 24 24"> <line x1="2" x2="5" y1="12" y2="12" /> <line x1="19" x2="22" y1="12" y2="12" /> <line x1="12" x2="12" y1="2" y2="5" /> <line x1="12" x2="12" y1="19" y2="22" /> <circle cx="12" cy="12" r="7" /> <circle cx="12" cy="12" r="3" /> </symbol>
+<symbol id="i-magnet" viewBox="0 0 24 24"> <path d="m12 15 4 4" /> <path d="M2.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l6.029-6.029a1 1 0 1 1 3 3l-6.029 6.029a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l6.365-6.367A1 1 0 0 0 8.716 4.282z" /> <path d="m5 8 4 4" /> </symbol>
+<symbol id="i-map-pin" viewBox="0 0 24 24"> <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /> </symbol>
+<symbol id="i-map" viewBox="0 0 24 24"> <path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /> <path d="M15 5.764v15" /> <path d="M9 3.236v15" /> </symbol>
+<symbol id="i-maximize" viewBox="0 0 24 24"> <path d="M8 3H5a2 2 0 0 0-2 2v3" /> <path d="M21 8V5a2 2 0 0 0-2-2h-3" /> <path d="M3 16v3a2 2 0 0 0 2 2h3" /> <path d="M16 21h3a2 2 0 0 0 2-2v-3" /> </symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"> <path d="M5 12h14" /> </symbol>
+<symbol id="i-mountain-snow" viewBox="0 0 24 24"> <path d="m8 3 4 8 5-5 5 15H2L8 3z" /> <path d="M4.14 15.08c2.62-1.57 5.24-1.43 7.86.42 2.74 1.94 5.49 2 8.23.19" /> </symbol>
+<symbol id="i-mountain" viewBox="0 0 24 24"> <path d="m8 3 4 8 5-5 5 15H2L8 3z" /> </symbol>
+<symbol id="i-mouse-pointer-2" viewBox="0 0 24 24"> <path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z" /> </symbol>
+<symbol id="i-move" viewBox="0 0 24 24"> <path d="M12 2v20" /> <path d="m15 19-3 3-3-3" /> <path d="m19 9 3 3-3 3" /> <path d="M2 12h20" /> <path d="m5 9-3 3 3 3" /> <path d="m9 5 3-3 3 3" /> </symbol>
+<symbol id="i-pen-line" viewBox="0 0 24 24"> <path d="M13 21h8" /> <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> </symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"> <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /> </symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"> <path d="M5 12h14" /> <path d="M12 5v14" /> </symbol>
+<symbol id="i-printer" viewBox="0 0 24 24"> <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /> <path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6" /> <rect x="6" y="14" width="12" height="8" rx="1" /> </symbol>
+<symbol id="i-redo-2" viewBox="0 0 24 24"> <path d="m15 14 5-5-5-5" /> <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13" /> </symbol>
+<symbol id="i-rotate-ccw-clock" viewBox="0 0 24 24"> <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M12 7v5l4 2" /> </symbol>
+<symbol id="i-satellite" viewBox="0 0 24 24"> <path d="m13.5 6.5-3.148-3.148a1.205 1.205 0 0 0-1.704 0L6.352 5.648a1.205 1.205 0 0 0 0 1.704L9.5 10.5" /> <path d="M16.5 7.5 19 5" /> <path d="m17.5 10.5 3.148 3.148a1.205 1.205 0 0 1 0 1.704l-2.296 2.296a1.205 1.205 0 0 1-1.704 0L13.5 14.5" /> <path d="M9 21a6 6 0 0 0-6-6" /> <path d="M9.352 10.648a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l4.296-4.296a1.205 1.205 0 0 0 0-1.704l-2.296-2.296a1.205 1.205 0 0 0-1.704 0z" /> </symbol>
+<symbol id="i-save-pen" viewBox="0 0 24 24"> <path d="M13.33 13H8a1 1 0 00-1 1v7" /> <path d="M14.363 17.634a2 2 0 00-.506.854l-.837 2.87a.5.5 0 00.62.62l2.87-.837a2 2 0 00.854-.506l4.013-4.009a1 1 0 10-3.004-3.004z" /> <path d="M7 3v4a1 1 0 001 1h7" /> <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h10.2a2 2 0 011.4.6l3.8 3.8a2 2 0 01.6 1.4v.3" /> </symbol>
+<symbol id="i-save" viewBox="0 0 24 24"> <path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /> <path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7" /> <path d="M7 3v4a1 1 0 0 0 1 1h7" /> </symbol>
+<symbol id="i-search" viewBox="0 0 24 24"> <path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /> </symbol>
+<symbol id="i-square-dashed" viewBox="0 0 24 24"> <path d="M5 3a2 2 0 0 0-2 2" /> <path d="M19 3a2 2 0 0 1 2 2" /> <path d="M21 19a2 2 0 0 1-2 2" /> <path d="M5 21a2 2 0 0 1-2-2" /> <path d="M9 3h1" /> <path d="M9 21h1" /> <path d="M14 3h1" /> <path d="M14 21h1" /> <path d="M3 9v1" /> <path d="M21 9v1" /> <path d="M3 14v1" /> <path d="M21 14v1" /> </symbol>
+<symbol id="i-target" viewBox="0 0 24 24"> <circle cx="12" cy="12" r="10" /> <circle cx="12" cy="12" r="6" /> <circle cx="12" cy="12" r="2" /> </symbol>
+<symbol id="i-triangle-alert" viewBox="0 0 24 24"> <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /> </symbol>
+<symbol id="i-undo-2" viewBox="0 0 24 24"> <path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" /> </symbol>
+<symbol id="i-vector-polygon" viewBox="0 0 24 24"> <path d="m12.828 4.813 5.344 2.375" /> <path d="m15.769 18.153 3.461-8.306" /> <path d="m5.687 14.074 7.625 4.852" /> <path d="M9.772 5.579 5.228 11.42" /> <circle cx="11" cy="4" r="2" /> <circle cx="15" cy="20" r="2" /> <circle cx="20" cy="8" r="2" /> <circle cx="4" cy="13" r="2" /> </symbol>
+<symbol id="i-waves-horizontal" viewBox="0 0 24 24"> <path d="M2 12q2.5 2 5 0t5 0 5 0 5 0" /> <path d="M2 19q2.5 2 5 0t5 0 5 0 5 0" /> <path d="M2 5q2.5 2 5 0t5 0 5 0 5 0" /> </symbol>
+<symbol id="i-x" viewBox="0 0 24 24"> <path d="M18 6 6 18" /> <path d="m6 6 12 12" /> </symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+<symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M22 12h-4"/><path d="M6 12H2"/><path d="M12 6V2"/><path d="M12 22v-4"/></symbol>
+<symbol id="i-ruler" viewBox="0 0 24 24"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></symbol>
+<symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 12h8"/></symbol>
+<symbol id="i-funnel" viewBox="0 0 24 24"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7"/><path d="M10 4H3"/><path d="M21 12h-9"/><path d="M8 12H3"/><path d="M21 20h-5"/><path d="M12 20H3"/><path d="M14 2v4"/><path d="M8 10v4"/><path d="M16 18v4"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-circle-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+<symbol id="i-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></symbol>
+<symbol id="i-ka-align" viewBox="0 0 24 24"><rect x="2" y="3" width="8" height="6" rx="1"/><rect x="14" y="3" width="8" height="6" rx="1"/><path d="M6 9l6 9 6-9"/><circle cx="12" cy="20" r="1"/></symbol>
+<symbol id="i-ka-cloud" viewBox="0 0 24 24"><circle cx="6" cy="7" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="18" cy="8" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="14" cy="11" r="1"/><circle cx="19" cy="14" r="1"/><circle cx="5" cy="17" r="1"/><circle cx="11" cy="17" r="1"/><circle cx="16" cy="19" r="1"/></symbol>
+<symbol id="i-ka-mesh" viewBox="0 0 24 24"><path d="M12 3 3 20h18Z"/><path d="M7.5 11.5h9"/><path d="M12 20 7.5 11.5"/><path d="m12 20 4.5-8.5"/></symbol>
+<symbol id="i-ka-ortho" viewBox="0 0 24 24"><rect x="3" y="13" width="18" height="8" rx="1"/><path d="M7 3v6"/><path d="M12 3v6"/><path d="M17 3v6"/><path d="m5 7 2 2 2-2"/><path d="m10 7 2 2 2-2"/><path d="m15 7 2 2 2-2"/></symbol>
+<symbol id="i-ka-section" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9.5c3 1 6-1 9 0s6 1 9 0"/><path d="M3 15c3 1 6-1 9 0s6 1 9 0"/></symbol>
+<symbol id="i-ka-contour" viewBox="0 0 24 24"><path d="M12 3c5 0 9 3.5 9 8.5S17 21 12 21s-9-4-9-9.5S7 3 12 3Z"/><path d="M12 8c2.5 0 4.5 1.6 4.5 4s-2 4.5-4.5 4.5-4.5-2-4.5-4.5S9.5 8 12 8Z"/></symbol>
+</svg>
+
+<header class="doc-cap">
+  <span class="word">AGI 설계도</span>
+  <span class="rule"></span>
+  <span class="muted">고고학 사진측량 · Strata 계열</span>
+  <span class="mono muted" style="font-size:12px">v0.2 · 2026-10-13</span>
+  <span class="sp"></span>
+  <span class="muted" style="font-size:12px">화면 보기</span>
+  <span class="seg" id="lookSeg"><button data-look="base" class="on">기본 모양</button><button data-look="paper">새 모양</button></span>
+</header>
+
+<div class="layout">
+<nav class="toc" id="toc">
+  <div class="capline">설계</div>
+  <a href="#s0"><span class="n">00</span>표지</a>
+  <a href="#s1"><span class="n">01</span>제품의 뜻</a>
+  <a href="#s2"><span class="n">02</span>디자인 계승</a>
+  <a href="#s3"><span class="n">03</span>화면 구조</a>
+  <a href="#s4"><span class="n">04</span>리본과 단추 명세</a>
+  <a href="#s5"><span class="n">05</span>화면 보드</a>
+  <div class="capline">고고학</div>
+  <a href="#s6"><span class="n">06</span>촬영 방법</a>
+  <a href="#s7"><span class="n">07</span>양식</a>
+  <div class="capline">엔진</div>
+  <a href="#s8"><span class="n">08</span>엔진 설계</a>
+  <a href="#s9"><span class="n">09</span>Agisoft 비교와 검증</a>
+  <a href="#s10"><span class="n">10</span>파일과 자료 구조</a>
+  <div class="capline">개발</div>
+  <a href="#s11"><span class="n">11</span>기술 결정</a>
+  <a href="#s12"><span class="n">12</span>개발 지침</a>
+  <a href="#s13"><span class="n">13</span>제작 계획</a>
+</nav>
+
+<main>
+
+<!-- ============================== 00 표지 ============================== -->
+<section class="sheet" id="s0"><div class="inner">
+  <div class="secno">00</div>
+  <div style="border-top:1px solid var(--ink); border-bottom:1px solid var(--ink); padding:32px 0; display:grid; grid-template-columns:1fr 520px; gap:48px; align-items:center;">
+    <div>
+      <h1 class="display">AGI 설계도</h1>
+      <p class="lead muted" style="margin-top:8px">발굴 현장에서 찍은 사진으로 보고서에 싣는 실측 도면을 만드는 프로그램.<br>Strata를 만든 같은 손으로, 같은 화면 언어로 설계합니다.</p>
+      <div style="display:flex; gap:8px; margin-top:24px">
+        <a class="btn" href="#s5">화면 보드 보기</a>
+        <a class="btn" href="#s4">단추 명세 보기</a>
+        <a class="btn" href="#s12">개발 지침 보기</a>
+      </div>
+    </div>
+    <div class="paper" style="padding:0">
+      <div style="display:grid; grid-template-columns:88px 1fr;">
+        <div style="padding:8px 12px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line)">도면명</div>
+        <div style="padding:6px 12px; border-bottom:1px solid var(--line); font-family:var(--name); font-weight:var(--nameWeight); font-size:20px; line-height:28px">AGI 제작 설계도</div>
+        <div style="padding:8px 12px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line)">계열</div>
+        <div style="padding:8px 12px; border-bottom:1px solid var(--line)">Strata (mac-hgis) 와 같은 디자인 체계</div>
+        <div style="padding:8px 12px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line)">엔진</div>
+        <div style="padding:8px 12px; border-bottom:1px solid var(--line)">순수 Rust 사진측량 엔진 (정렬 · 점군 · 면 · 정사 · 단면)</div>
+        <div style="padding:8px 12px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line)">저장소</div>
+        <div style="padding:8px 12px; border-bottom:1px solid var(--line)" class="mono">github.com/kesekikwon-netizen/agi</div>
+        <div style="padding:8px 12px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--line)">판 · 날짜</div>
+        <div style="padding:8px 12px; border-bottom:1px solid var(--line)"><span class="mono">v0.2</span> · <span class="mono">2026-10-13</span></div>
+        <div style="padding:8px 12px; font-size:11px; color:var(--muted)">진행</div>
+        <div style="padding:8px 12px">1단계 끝 (좌표계 · 카메라 모형 · CI) · <span class="dot"></span>다음 2단계 정렬</div>
+      </div>
+    </div>
+  </div>
+  <div class="note">이 설계도의 화면 보드에 나오는 숫자와 이름(광령리1, 1호 주거지, 오차 값 등)은 <b>견본</b>입니다. 잰 값이 아닙니다. 표본 조사는 Strata 설계 명세의 「광령리1」을 그대로 써서 두 앱이 같은 자료를 보여 주게 했습니다. 디자인 근거: <span class="mono">mac-hgis/src/app/KaTheme.cpp</span>, <span class="mono">mac-hgis/docs/design/2026-10-04-quiet-plate/DESIGN_SPEC.md</span>, <span class="mono">tokens.json</span>.</div>
+</div></section>
+
+<!-- ============================== 01 제품의 뜻 ============================== -->
+<section class="sheet" id="s1"><div class="inner">
+  <div class="secno">01</div>
+  <h2 class="title">제품의 뜻</h2>
+  <p class="lead">AGI는 발굴 현장의 사진으로 <b>평면 정사영상 · 단면 정사영상 · 3D 모델 · 수치표고 · 등고선</b>을 만들고, 그 과정을 보고서에 실을 수 있는 <b>처리 기록지</b>로 남기는 고고학 전용 사진측량 프로그램입니다.</p>
+  <div class="cols two">
+    <div>
+      <div class="capline">누가 쓰는가</div>
+      <ul class="plain">
+        <li>발굴 조사원 · 실측 담당: 유구 평면, 토층 단면을 사진으로 실측합니다.</li>
+        <li>유물 담당: 회전판 사진으로 유물 3D 모델과 실측 투영도를 만듭니다.</li>
+        <li>조사 책임자: 처리 기록지와 오차 표로 결과를 확인하고 제출합니다.</li>
+      </ul>
+      <div class="capline">지금 쓰는 범용 프로그램에서 막히는 곳</div>
+      <ul class="plain">
+        <li>토층 <b>단면 정사영상</b>을 만들려면 좌표 돌리기·자르기를 손으로 여러 번 해야 합니다.</li>
+        <li>처리 결과를 <b>보고서 양식</b>(촬영 기록, 기준점 오차, 처리 설정)으로 정리하는 일이 따로 남습니다.</li>
+        <li>점 하나하나가 얼마나 믿을 만한지(<b>점별 정밀도</b>)를 기본 결과로 보기 어렵습니다.</li>
+        <li>화면 용어가 측량·영상 업계 말이라 현장 조사원이 바로 읽기 어렵습니다.</li>
+      </ul>
+    </div>
+    <div>
+      <div class="capline">성공 기준 (잴 수 있는 것만)</div>
+      <table class="t3 dense">
+        <tr><th>기준</th><th>재는 법</th></tr>
+        <tr><td>정밀도</td><td>같은 사진·기준점·검사점에서 검사점 오차가 Metashape Pro 이하 (§09 시험 절차)</td></tr>
+        <tr><td>한 흐름</td><td>사진 넣기 → 정렬 → 기준점 → 점군 → 평면·단면 정사 → 처리 기록지가 화면 하나에서 끝남</td></tr>
+        <tr><td>같은 계열</td><td>Strata와 나란히 띄운 화면이 §02 디자인 점검표를 모두 통과</td></tr>
+        <tr><td>제출 연결</td><td>성과품이 Strata 제출 꾸러미 규격(EPSG:5179 · PDF · MANIFEST.sha256)에 그대로 들어감</td></tr>
+        <tr><td>재현</td><td>같은 입력과 설정이면 같은 결과 (처리 기록지에 엔진 판 · 설정 지문 기록)</td></tr>
+      </table>
+      <div class="capline">하지 않을 것</div>
+      <ul class="plain">
+        <li>어두운 화면, 자동 저장, 근거 없는 숫자 표시</li>
+        <li>원본 사진 고치기 (가리기·보정은 옆에 따로 저장)</li>
+        <li>인터넷 필수 (현장 천막에서도 모든 처리가 됩니다)</li>
+        <li>클라우드 업로드 강요</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============================== 02 디자인 계승 ============================== -->
+<section class="sheet" id="s2"><div class="inner">
+  <div class="secno">02</div>
+  <h2 class="title">디자인 계승</h2>
+  <p class="lead">AGI는 Strata의 화면 규칙을 그대로 따릅니다. 새로 만든 것은 사진측량에만 있는 화면(3D 보기, 사진 확대경, 정밀도 색)뿐이고, 그것도 Strata의 부품과 치수로 만듭니다.</p>
+
+  <h3 class="heading">두 모양</h3>
+  <p>Strata에는 <b>기본 모양</b>(흰 바탕 · 남색 · 파랑)과 디자이너의 2차 안 <b>새 모양</b>(상아색 종이 · 먹 · 흙색 하나)이 있고, 「화면 보기 › 새 모양」으로 바꿉니다. AGI도 같습니다. 구조 · 치수 · 글자 크기 · 단추 순서는 두 모양에서 같고 색만 바뀝니다. 위쪽 「화면 보기」 단추로 이 설계도 전체를 바꿔 볼 수 있습니다.</p>
+
+  <h3 class="heading">원칙 아홉</h3>
+  <table class="t3">
+    <tr><th style="width:28px" class="num">#</th><th style="width:200px">원칙</th><th>AGI에서 뜻하는 것</th></tr>
+    <tr><td class="num">1</td><td>한 장의 종이</td><td>리본 · 패널 · 홈 · 창 바탕은 같은 바탕색. 상자 안에 상자를 넣지 않습니다. 3D 보기는 패널 사이를 꽉 채웁니다.</td></tr>
+    <tr><td class="num">2</td><td>상자 말고 선</td><td>영역은 1 px 선이나 24 px 여백 중 하나로만 나눕니다. 표는 삼선표(위 먹선 · 머리 아래 가는 선 · 끝 먹선).</td></tr>
+    <tr><td class="num">3</td><td>강조색은 한 화면에 하나</td><td>채운 주 단추는 화면마다 하나, 저장 안 된 「저장」 타일, 6 px 점 + 글자(「저장 안 됨」「다음」). 탭 · 선택 줄 · 진행 막대에는 쓰지 않습니다.</td></tr>
+    <tr><td class="num">4</td><td>켜짐의 세 모습</td><td>손에 든 도구(기준점 찍기 · 단면선 긋기) · 보이게 켠 것 · 지금 보는 탭. 굵게 하거나 폭을 바꾸지 않습니다.</td></tr>
+    <tr><td class="num">5</td><td>종이는 네모, 누르는 것은 둥글게</td><td>도면 · 양식 · 표제란 · 범례 견본은 모서리 0과 먹 테두리. 단추 · 입력은 8, 작은 표시는 4.</td></tr>
+    <tr><td class="num">6</td><td>이름은 명조, 잰 값은 고정폭</td><td>명조(새 모양)는 20 px 이상 고유 이름에만: 조사명, 고른 기준점 이름, 창의 판정 문장. 좌표 · 오차 · 픽셀 · 경로는 고정폭, 오른쪽 맞춤, 자릿수 고정. 한글은 고정폭에 넣지 않습니다.</td></tr>
+    <tr><td class="num">7</td><td>평소에는 조용히</td><td>저장됨 · 통과는 회색 글자만. 손이 필요한 것만 점 + 글자, 주의는 삼각형 + 글자, 빨강은 제출을 막는 것만.</td></tr>
+    <tr><td class="num">8</td><td>현장에서 읽힌다</td><td>읽어야 하는 글자는 가장 옅어도 「흐림」 단계 이상. 누르는 곳은 32 px(줄 · 목록 24, 3D 보기 단추 36). 상태는 늘 그림 + 글자.</td></tr>
+    <tr><td class="num">9</td><td>꾸밈 없음</td><td>그라데이션 · 흐림 · 유리 효과 · 반투명 없음. 그림자는 떠 있는 것(보기 위 카드, 메뉴, 창)에만.</td></tr>
+  </table>
+
+  <h3 class="heading">색</h3>
+  <p class="muted">지금 고른 모양의 실제 값입니다. 대비는 바탕색에 대해 이 문서가 직접 계산한 값입니다.</p>
+  <div class="sw" id="swatches"></div>
+
+  <h3 class="heading">글꼴 역할</h3>
+  <table class="t3" id="typeTable">
+    <tr><th style="width:110px">역할</th><th style="width:90px">글꼴</th><th style="width:90px" class="num">크기 / 줄</th><th>견본</th><th style="width:260px">쓰는 곳</th></tr>
+    <tr><td>표제</td><td>이름체</td><td class="num">40 / 48</td><td><span style="font-family:var(--name);font-weight:var(--nameWeight);font-size:40px;line-height:48px">광령리1</span></td><td>홈 표제란의 조사명 (앱에 한 번)</td></tr>
+    <tr><td>제목</td><td>이름체</td><td class="num">28 / 36</td><td><span style="font-family:var(--name);font-weight:var(--nameWeight);font-size:28px;line-height:36px">사진 148장 중 146장을 맞췄습니다</span></td><td>결과 창의 판정 문장</td></tr>
+    <tr><td>머리</td><td>이름체</td><td class="num">20 / 28</td><td><span style="font-family:var(--name);font-weight:var(--nameWeight);font-size:20px;line-height:28px">GCP2</span></td><td>고른 기준점 · 유구 이름, 물음 창</td></tr>
+    <tr><td>이끎</td><td>본문체</td><td class="num">15 / 24</td><td style="font-size:15px">오늘 찍은 사진으로 실측 도면을 만드세요.</td><td>홈 소제목, 이끄는 한 문장</td></tr>
+    <tr><td>본문</td><td>본문체</td><td class="num">13 / 20</td><td>사진 넣기 · 정렬 · 점군 만들기</td><td>단추 · 줄 · 메뉴 · 패널 제목</td></tr>
+    <tr><td>꼬리</td><td>본문체</td><td class="num">12 / 18</td><td style="font-size:12px;color:var(--muted)">기준점 4개를 사진 3장 이상에 찍으세요.</td><td>입력 이름 · 도움말 · 상태 문장</td></tr>
+    <tr><td>작은 머리</td><td>본문체</td><td class="num">11 / 16</td><td style="font-size:11px;color:var(--muted)">기준점 · 검사점</td><td>표 머리 · 묶음 이름</td></tr>
+    <tr><td>목록</td><td>본문체</td><td class="num">10 / 14</td><td style="font-size:10px">평면 사진</td><td>작업 목록 줄만</td></tr>
+    <tr><td>수치</td><td>고정폭</td><td class="num">20 / 28</td><td class="mono" style="font-size:20px">2.8 <span style="font-family:var(--sans);font-size:12px;color:var(--faint)">mm</span></td><td>검사점 오차 · 사진 수 · 넓이</td></tr>
+    <tr><td>고정폭</td><td>고정폭</td><td class="num">12 / 18</td><td class="mono" style="font-size:12px">X 147,999.305 · Y 98,157.620 · EL. 152.36</td><td>좌표 · 축척 · 경로 · 표 숫자</td></tr>
+    <tr><td>작은 고정폭</td><td>고정폭</td><td class="num">10 / 14</td><td class="mono" style="font-size:10px;color:var(--muted)">DSC_0412.JPG</td><td>보기 위 이름 · 사진 파일 이름</td></tr>
+  </table>
+  <p class="muted" style="font-size:12px">이름체: 새 모양은 명조(Noto Serif KR → 바탕), 기본 모양은 본문체 굵게. 본문체: 맑은 고딕(맥은 Apple SD 산돌고딕 Neo). 고정폭: Consolas(맥은 SF Mono · Menlo). 숫자 모양 <span class="mono">147,999.305</span> · <span class="mono">EL. 152.36</span> · <span class="mono">2.8 mm</span> · <span class="mono">0.42 px</span> · <span class="mono">1:20</span> · <span class="mono">5186 → 5179</span>.</p>
+
+  <h3 class="heading">켜짐의 세 모습</h3>
+  <div style="display:flex; gap:48px; align-items:flex-end; flex-wrap:wrap" id="onStates"></div>
+
+  <h3 class="heading">AGI가 더하는 자료 기호</h3>
+  <p>지도 기호는 Strata 데이터 색을 그대로 씁니다(기준점 황토 삼각형, 단면선 자주, 조사구역 흙색). 사진측량에만 있는 것 다섯을 같은 방식으로 더합니다. <span class="mono muted" style="font-size:12px">새 (제안)</span></p>
+  <table class="t3">
+    <tr><th style="width:140px">자료</th><th style="width:120px">기호</th><th>규칙</th></tr>
+    <tr><td>카메라 (사진 위치)</td><td><svg width="40" height="28"><polygon points="20,4 34,24 6,24" fill="#FFFFFF" stroke="#141413" stroke-width="1"/><line x1="20" y1="4" x2="20" y2="24" stroke="#141413" stroke-width="0.75"/></svg></td><td>흰 바탕 먹 1 px 사각뿔. 고른 사진은 손 도구 색으로 채움. 정렬 안 된 사진은 표시하지 않고 목록에 「정렬 안 됨」.</td></tr>
+    <tr><td>기준점</td><td><svg width="40" height="28"><polygon points="20,6 27,20 13,20" fill="#C9A82D" stroke="#141413" stroke-width="1"/><text x="30" y="20" font-family="Consolas,Menlo,monospace" font-size="9">G1</text></svg></td><td>Strata 그대로: 10 px 삼각형, 먹 선, 황토 <span class="mono">#C9A82D</span>, 고정폭 10 <span class="mono">GCP1</span>.</td></tr>
+    <tr><td>검사점</td><td><svg width="40" height="28"><polygon points="20,6 27,20 13,20" fill="#FFFFFF" stroke="#141413" stroke-width="1.25"/><circle cx="20" cy="15.5" r="1.6" fill="#141413"/></svg></td><td>같은 삼각형을 흰색으로 비우고 가운데 점. 계산에 넣지 않은 점이라는 뜻. <span class="mono">CP1</span>.</td></tr>
+    <tr><td>축척자</td><td><svg width="40" height="28"><circle cx="8" cy="14" r="4" fill="#fff" stroke="#141413"/><circle cx="8" cy="14" r="1.5" fill="#141413"/><circle cx="32" cy="14" r="4" fill="#fff" stroke="#141413"/><circle cx="32" cy="14" r="1.5" fill="#141413"/><line x1="12" y1="14" x2="28" y2="14" stroke="#141413" stroke-width="1"/></svg></td><td>두 표지(원형 타깃)를 먹 1 px 선으로 잇고 길이 <span class="mono">1.000 m</span>를 고정폭으로.</td></tr>
+    <tr><td>정밀도 색</td><td><svg width="110" height="14"><defs><linearGradient id="pr"><stop offset="0" stop-color="#E3EDD8"/><stop offset=".3" stop-color="#A9C48A"/><stop offset=".55" stop-color="#E3C27A"/><stop offset=".8" stop-color="#D97757"/><stop offset="1" stop-color="#8F2D1F"/></linearGradient></defs><rect width="110" height="10" fill="url(#pr)" stroke="#141413" stroke-width="0.5"/></svg></td><td>점마다 계산한 흔들림(σ, mm)을 다섯 단계로. 범례는 고정폭 <span class="mono">0 · 1 · 2 · 4 · 8 mm</span>와 단계 경계. 이것은 자료이므로 화면 장식 규칙(그라데이션 금지)과 따로 봅니다.</td></tr>
+  </table>
+
+  <h3 class="heading">말 고르기</h3>
+  <p>Strata 문구 규칙을 따릅니다: 합니다체, 한 문장에 한 뜻, 한 줄 40자, 단추 이름은 「」, 숫자는 위 모양. 업계 말 대신 현장 말을 씁니다.</p>
+  <table class="t3 dense">
+    <tr><th style="width:180px">흔히 쓰는 말</th><th style="width:180px">AGI 화면 말</th><th>뜻</th></tr>
+    <tr><td>Project</td><td>조사</td><td>파일 하나 (<span class="mono">.agi</span>) + 같은 폴더의 자료</td></tr>
+    <tr><td>Chunk</td><td>사진 묶음</td><td>함께 정렬하는 사진 모음 (예: 평면, 북벽)</td></tr>
+    <tr><td>Align Photos</td><td>정렬</td><td>사진끼리 맞춰 찍은 자리와 방향을 찾기</td></tr>
+    <tr><td>Tie points</td><td>성긴 점</td><td>정렬에서 생긴 점</td></tr>
+    <tr><td>Dense cloud / Point cloud</td><td>점군</td><td>사진 모든 곳에서 만든 촘촘한 점</td></tr>
+    <tr><td>Mesh / Texture</td><td>면 / 질감</td><td>점을 이은 겉면 / 겉면에 입힌 사진 색</td></tr>
+    <tr><td>GCP / Check point</td><td>기준점 / 검사점</td><td>좌표를 아는 표지 / 계산에 안 넣고 오차만 재는 표지</td></tr>
+    <tr><td>Scale bar</td><td>축척자</td><td>길이를 아는 두 표지</td></tr>
+    <tr><td>Gradual selection</td><td>점 거르기</td><td>믿기 어려운 성긴 점 지우기</td></tr>
+    <tr><td>Optimize cameras</td><td>최적화</td><td>기준점 · 축척자를 넣어 다시 계산</td></tr>
+    <tr><td>Report</td><td>처리 기록지</td><td>보고서에 싣는 처리 기록 (§07)</td></tr>
+  </table>
+
+  <h3 class="heading">디자인 점검표</h3>
+  <p>화면을 하나 만들 때마다 아래를 확인합니다. 하나라도 어기면 고칩니다.</p>
+  <table class="t3 dense">
+    <tr><th style="width:28px" class="num">#</th><th>확인</th></tr>
+    <tr><td class="num">1</td><td>채운 주 단추가 화면에 하나뿐인가 · 강조색이 탭 · 선택 줄 · 진행 막대에 없는가</td></tr>
+    <tr><td class="num">2</td><td>상자 안에 상자 · 둥근 카드 · 알약 모양 표시 · 왼쪽 강조 막대가 없는가</td></tr>
+    <tr><td class="num">3</td><td>표가 삼선표인가 (세로선 · 줄무늬 없음)</td></tr>
+    <tr><td class="num">4</td><td>숫자가 고정폭 · 오른쪽 맞춤 · 자릿수 고정이고 단위가 흐린 글자인가</td></tr>
+    <tr><td class="num">5</td><td>이름체가 20 px 이상 고유 이름에만 쓰였는가</td></tr>
+    <tr><td class="num">6</td><td>상태가 그림 + 글자인가 (색만으로 말하지 않는가)</td></tr>
+    <tr><td class="num">7</td><td>리본 치수(행 118 · 칩 58 · 타일 50 · 글자 13 · 묶음 11)와 상태줄 32를 지켰는가</td></tr>
+    <tr><td class="num">8</td><td>기본 모양과 새 모양 모두에서 같은 구조로 보이는가</td></tr>
+    <tr><td class="num">9</td><td>어두운 화면 · 그라데이션 · 반투명 · 붙박이 그림자가 없는가</td></tr>
+  </table>
+</div></section>
+
+<!-- ============================== 03 화면 구조 ============================== -->
+<section class="sheet" id="s3"><div class="inner">
+  <div class="secno">03</div>
+  <h2 class="title">화면 구조</h2>
+  <p class="lead">Strata와 같은 층 쌓기입니다. 메뉴 막대는 없고 한 줄 리본만 있습니다.</p>
+  <div class="cols two">
+    <table class="t3">
+      <tr><th>층</th><th class="num">높이 px</th><th>내용</th></tr>
+      <tr><td>제목줄</td><td class="num">32</td><td><span class="mono">AGI</span> · <span class="mono">광령리1 - AGI</span> · <span class="mono">광령리1 * - AGI</span></td></tr>
+      <tr><td>리본</td><td class="num">118</td><td>27칩, 칩 간격 58, 타일 50, 그림 28, 글자 13, 묶음 이름 11/700, 오른쪽 찾기 칸</td></tr>
+      <tr><td>도구 줄</td><td class="num">44</td><td>손에 든 도구가 있을 때만 (기준점 · 축척자 · 가리기 · 단면 · 선 따기)</td></tr>
+      <tr><td>보기 탭</td><td class="num">36</td><td>홈 · 모델 · 사진 · 정사 ✕ · 단면 ✕ · 도면 ✕ · 오른쪽 끝 조사 상태</td></tr>
+      <tr><td>화면</td><td class="num">나머지</td><td>왼쪽 작업 목록 348 | 7 | 보기 | 7 | 오른쪽 기록 272 (정사 · 단면 · 도면은 320)</td></tr>
+      <tr><td>상태줄</td><td class="num">32</td><td>왼쪽 다음 할 일 문장 · 오른쪽 칸들</td></tr>
+    </table>
+    <table class="t3">
+      <tr><th>치수</th><th>값</th></tr>
+      <tr><td>간격</td><td class="mono">4 · 8 · 12 · 16 · 24 · 32 · 48</td></tr>
+      <tr><td>높이</td><td><span class="mono">24</span> 줄 · 작업 목록 &nbsp; <span class="mono">32</span> 기본 · 창 단추 &nbsp; <span class="mono">40</span> 홈 큰 단추 &nbsp; <span class="mono">36</span> 보기 위 단추</td></tr>
+      <tr><td>모서리</td><td><span class="mono">0</span> 종이 &nbsp; <span class="mono">4</span> 체크 · 견본 &nbsp; <span class="mono">8</span> 단추 · 입력 · 메뉴 &nbsp; <span class="mono">12.5</span> 리본 타일</td></tr>
+      <tr><td>창 폭</td><td><span class="mono">S 440</span> · <span class="mono">M 560</span> · <span class="mono">L 860</span> · 검수·제출 <span class="mono">820 × 580</span></td></tr>
+      <tr><td>패널 안쪽</td><td><span class="mono">16</span> (창은 <span class="mono">24</span>), 이름 칸 폭 창 <span class="mono">96</span> · 기록판 <span class="mono">64</span></td></tr>
+      <tr><td>움직임</td><td>마우스 올림 · 켜짐 <span class="mono">120 ms</span>, 펼침 <span class="mono">160 ms</span>, 시스템 애니메이션 끔이면 없음</td></tr>
+      <tr><td>단축키 공통</td><td><span class="mono">F9</span> 왼쪽 접기 · <span class="mono">Ctrl+F11</span> 보기 넓게 · <span class="mono">F11</span> 전체 화면 · <span class="mono">Ctrl+Z / Ctrl+Y</span></td></tr>
+    </table>
+  </div>
+</div></section>
+
+<!-- ============================== 04 리본과 단추 명세 ============================== -->
+<section class="sheet wide" id="s4"><div class="inner">
+  <div class="secno">04</div>
+  <h2 class="title">리본과 단추 명세</h2>
+  <p class="lead">Strata처럼 묶음 일곱, 칩 스물일곱입니다. 아래 리본과 명세 표는 이 문서 안의 같은 자료 한 벌에서 만들어지므로 서로 어긋나지 않습니다. 개발도 이 자료를 그대로 옮겨 씁니다 (<span class="mono">crates/agi-app/src/ribbon.rs</span>).</p>
+  <div class="bwrap" style="background:var(--ground)"><div id="ribbonDemo" style="width:1920px; transform-origin:0 0"></div></div>
+  <p class="spec">견본 상태: 「저장」 저장 안 됨 · 「기준점」 손에 든 도구 · 「정사」 이후는 점군이 없어 꺼짐 아님(견본은 모두 켜짐 상태로 그림) · 마우스를 올리면 타일 색이 바뀝니다.</p>
+
+  <h3 class="heading">리본 칩 명세 (27)</h3>
+  <p class="muted">켜지는 때: 이 조건이 아니면 칩은 꺼짐 모양(타일 흐림 · 글자 회색)이고 마우스를 올리면 「왜 꺼졌는지」를 한 문장으로 알려 줍니다.</p>
+  <div id="chipSpec"></div>
+
+  <h3 class="heading">도구 줄 (손에 든 도구가 있을 때만, 높이 44)</h3>
+  <table class="t3 dense">
+    <tr><th style="width:110px">도구</th><th>줄의 단추 (왼쪽부터, 세로선으로 묶음)</th><th style="width:330px">끝내는 법</th></tr>
+    <tr><td>기준점 ›</td><td>점 찍기 · 확대경 · 자동 다듬기 | 기준점 ↔ 검사점 · 좌표 불러오기(CSV) · 좌표 붙여 넣기 | 되돌리기 · 다시 실행 | 닫기</td><td><span class="mono">Esc</span> 또는 「닫기」. 찍은 점은 바로 저장 안 됨 상태가 됩니다.</td></tr>
+    <tr><td>축척자 ›</td><td>끝점 고르기 · 길이 입력 · 정확도 | 축척자 목록 | 닫기</td><td>두 끝점을 고르면 길이 입력 칸이 바로 열립니다 (창 없음).</td></tr>
+    <tr><td>가리기 ›</td><td>붓 · 지우개 · 다각형 | 배경 자동(AI 아님, 색·깊이 기준) · 같은 묶음에 복사 | 붓 크기 <span class="mono">24 px</span> | 닫기</td><td>원본 사진은 바꾸지 않고 옆에 가리기 파일을 둡니다.</td></tr>
+    <tr><td>단면 ›</td><td>단면선 긋기 · 끝점 옮기기 | 두께 <span class="mono">±5 cm</span> · 보는 쪽 바꾸기 | 단면 만들기 | 닫기</td><td>선 두 점을 찍으면 <span class="mono">A–A′</span> 이름이 자동으로 붙고 오른쪽 판에 설정이 나옵니다.</td></tr>
+    <tr><td>선 따기 ›</td><td>선택 · 자석 | 유구 선 · 토층 선 · 유물 윤곽 | 완료 · 되돌리기 · 취소 · 연속 | 닫기</td><td>Strata 그리기 줄과 같은 순서 · 같은 단축키(오른쪽 클릭 · Enter 끝, Esc 버림).</td></tr>
+  </table>
+
+  <h3 class="heading">보기 탭과 상태줄</h3>
+  <div class="cols two">
+    <table class="t3 dense">
+      <tr><th>탭</th><th>보이는 것</th><th>닫기</th></tr>
+      <tr><td>홈</td><td>이어서 작업 · 최근 조사 · 작업 순서 · 계산 장치</td><td>없음</td></tr>
+      <tr><td>모델</td><td>3D 보기 (카메라 · 성긴 점 · 점군 · 면)</td><td>없음</td></tr>
+      <tr><td>사진</td><td>사진 한 장 크게 + 확대경 + 사진 띠</td><td>없음</td></tr>
+      <tr><td>정사</td><td>평면 정사영상 + 도곽 띠 + 설정</td><td>✕</td></tr>
+      <tr><td>단면</td><td>단면 정사영상 종이 + 표고 눈금</td><td>✕</td></tr>
+      <tr><td>도면</td><td>A4·A3 종이 조판 (Strata 도면과 같은 화면)</td><td>✕</td></tr>
+    </table>
+    <table class="t3 dense">
+      <tr><th>상태줄 칸 (오른쪽부터 아님, 왼쪽부터)</th><th>보기</th></tr>
+      <tr><td>다음 할 일 문장</td><td class="muted">「기준점 4개를 사진 3장 이상에 찍은 뒤 「최적화」를 누르세요.」</td></tr>
+      <tr><td>지금 도구</td><td>기준점</td></tr>
+      <tr><td>저장 안 됨</td><td><span class="dot"></span>저장 안 됨 3건 (있을 때만)</td></tr>
+      <tr><td>좌표</td><td><span class="mono">X 147,999.305 · Y 98,157.620 · Z 152.36</span></td></tr>
+      <tr><td>검사점 오차</td><td><span class="mono">2.8 mm</span> (검사점 2개 이상일 때)</td></tr>
+      <tr><td>좌표계</td><td>작업 5186 · 중부원점 ▾ <span class="mono muted">→ 제출 5179</span></td></tr>
+      <tr><td>계산 장치</td><td>GPU 사용 · 또는 <span class="mk"><span class="tri"></span>CPU로 계산 중</span></td></tr>
+    </table>
+  </div>
+</div></section>
+
+<!-- ============================== 05 화면 보드 ============================== -->
+<section class="sheet wide" id="s5"><div class="inner">
+  <div class="secno">05</div>
+  <h2 class="title">화면 보드</h2>
+  <p class="lead">실제 크기 1920 × 1040으로 그린 화면입니다. 기본은 폭에 맞춰 줄여 보이고, 「실제 크기」를 누르면 1:1로 봅니다. 모든 보드는 같은 표본 조사(광령리1 · 1호 주거지)를 씁니다.</p>
+  <div id="boards"></div>
+</div></section>
+
+<!-- ============================== 06 촬영 방법 ============================== -->
+<section class="sheet" id="s6"><div class="inner">
+  <div class="secno">06</div>
+  <h2 class="title">고고학 사진측량 촬영 방법</h2>
+  <p class="lead">정밀도는 계산보다 촬영에서 먼저 정해집니다. AGI는 도면 축척에서 거꾸로 촬영 조건을 정하고, 그 조건을 촬영 기록지(§07)와 처리 기록지에 남깁니다.</p>
+
+  <h3 class="heading">축척에서 촬영 조건으로</h3>
+  <p>도면에서 사람이 구별하는 가장 작은 길이를 <span class="mono">0.2 mm</span>로 보는 지도 제작 관례를 씁니다. 그러면 땅 위에서 허용되는 오차는 <span class="mono">0.2 mm × 축척 분모</span>입니다. 사진 한 화소가 덮는 땅의 크기(GSD)는 그 허용 오차의 4분의 1 이하로 잡습니다.</p>
+  <table class="t3">
+    <tr><th>도면 축척</th><th class="num">땅 위 허용 오차</th><th class="num">권장 GSD (이하)</th><th class="num">검사점 오차 목표 (이하)</th><th>주로 쓰는 곳</th></tr>
+    <tr><td class="mono">1:5</td><td class="num">1 mm</td><td class="num">0.25 mm</td><td class="num">1 mm</td><td>유물 실측</td></tr>
+    <tr><td class="mono">1:10</td><td class="num">2 mm</td><td class="num">0.5 mm</td><td class="num">2 mm</td><td>유물 · 작은 유구 세부</td></tr>
+    <tr><td class="mono">1:20</td><td class="num">4 mm</td><td class="num">1 mm</td><td class="num">4 mm</td><td>개별 유구 평면 · 토층 단면</td></tr>
+    <tr><td class="mono">1:50</td><td class="num">10 mm</td><td class="num">2.5 mm</td><td class="num">10 mm</td><td>유구 무리 · 트렌치</td></tr>
+    <tr><td class="mono">1:100</td><td class="num">20 mm</td><td class="num">5 mm</td><td class="num">20 mm</td><td>유구 배치도</td></tr>
+    <tr><td class="mono">1:200</td><td class="num">40 mm</td><td class="num">10 mm</td><td class="num">40 mm</td><td>조사구역 (드론)</td></tr>
+  </table>
+  <p class="muted" style="font-size:12px">「권장 GSD = 허용 오차 ÷ 4」와 검사점 목표는 AGI의 처음 기준입니다. 8단계 현장 시험(§13)에서 실제 자료로 확인한 뒤 고칩니다. 기관 기준이 따로 있으면 그쪽이 앞섭니다.</p>
+
+  <h3 class="heading">촬영 거리 계산</h3>
+  <div class="cols two" style="align-items:start">
+    <div>
+      <div class="dlg" style="position:static; box-shadow:none; border:1px solid var(--line); border-radius:8px">
+        <div class="dbody">
+          <div class="frow"><span class="l">센서 폭</span><div class="field num"><input id="cSensor" value="23.5" style="border:0;width:100%;text-align:right;font:13px var(--mono);background:transparent;color:var(--ink)"><span class="unit">mm</span></div></div>
+          <div class="frow"><span class="l">사진 폭</span><div class="field num"><input id="cPx" value="6000" style="border:0;width:100%;text-align:right;font:13px var(--mono);background:transparent;color:var(--ink)"><span class="unit">px</span></div></div>
+          <div class="frow"><span class="l">초점거리</span><div class="field num"><input id="cF" value="35" style="border:0;width:100%;text-align:right;font:13px var(--mono);background:transparent;color:var(--ink)"><span class="unit">mm</span></div></div>
+          <div class="frow"><span class="l">도면 축척 1 :</span><div class="field num"><input id="cScale" value="20" style="border:0;width:100%;text-align:right;font:13px var(--mono);background:transparent;color:var(--ink)"></div></div>
+          <div class="frow"><span class="l">겹침</span><div class="field num"><input id="cOv" value="80" style="border:0;width:100%;text-align:right;font:13px var(--mono);background:transparent;color:var(--ink)"><span class="unit">%</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="ledger" id="calcOut"></div>
+      <p class="muted" style="font-size:12px; margin-top:8px">GSD = 센서 폭 × 촬영 거리 ÷ (초점거리 × 사진 폭). 최대 거리는 권장 GSD를 넘지 않는 가장 먼 거리입니다. 실제로는 그보다 가깝게, 같은 거리로 찍습니다.</p>
+    </div>
+  </div>
+
+  <h3 class="heading">대상별 방법</h3>
+  <div class="cols">
+    <div>
+      <svg viewBox="0 0 280 150" width="100%" style="border-top:1px solid var(--ink); border-bottom:1px solid var(--line); background:var(--surface)">
+        <ellipse cx="140" cy="85" rx="70" ry="42" fill="#8A6B4A" stroke="#141413" stroke-width="1"/>
+        <g fill="none" stroke="#141413" stroke-width="0.75">
+          <rect x="56" y="34" width="20" height="14"/><rect x="88" y="34" width="20" height="14"/><rect x="120" y="34" width="20" height="14"/><rect x="152" y="34" width="20" height="14"/><rect x="184" y="34" width="20" height="14"/>
+          <rect x="56" y="60" width="20" height="14"/><rect x="88" y="60" width="20" height="14"/><rect x="120" y="60" width="20" height="14"/><rect x="152" y="60" width="20" height="14"/><rect x="184" y="60" width="20" height="14"/>
+          <ellipse cx="140" cy="85" rx="108" ry="62" stroke-dasharray="3 3"/>
+        </g>
+        <g fill="#C9A82D" stroke="#141413" stroke-width="1"><polygon points="40,28 46,40 34,40"/><polygon points="240,28 246,40 234,40"/><polygon points="40,130 46,142 34,142"/><polygon points="240,130 246,142 234,142"/></g>
+        <g fill="#fff" stroke="#141413" stroke-width="1"><polygon points="118,86 124,98 112,98"/><polygon points="166,78 172,90 160,90"/></g>
+        <text x="8" y="16" font-size="11" fill="#5E5D59" font-family="Malgun Gothic,Apple SD Gothic Neo,sans-serif">수직 격자 + 사선 고리</text>
+      </svg>
+      <h4 class="lead">A · 유구 평면 (주거지 · 수혈)</h4>
+      <ul class="plain">
+        <li>수직 촬영 격자: 앞뒤 겹침 80 %, 옆 겹침 60 %. 폴대 · 사다리 · 저고도 드론.</li>
+        <li>사선 고리 2바퀴(약 45°): 벽과 모서리를 채웁니다.</li>
+        <li>기준점 4개는 유구 바깥 모서리, 검사점 2개 이상은 안쪽. 축척자 2개를 서로 직각으로.</li>
+        <li>첫 장에 색표. 그늘막 또는 흐린 날. 반쪽 그림자 금지.</li>
+      </ul>
+    </div>
+    <div>
+      <svg viewBox="0 0 280 150" width="100%" style="border-top:1px solid var(--ink); border-bottom:1px solid var(--line); background:var(--surface)">
+        <rect x="30" y="40" width="220" height="90" fill="#8A6A47" stroke="#141413"/>
+        <path d="M30 70 C80 64 120 76 160 70 S220 66 250 72" fill="none" stroke="#141413"/>
+        <path d="M30 98 C70 92 110 112 160 104 S220 96 250 100" fill="none" stroke="#141413"/>
+        <line x1="30" y1="58" x2="250" y2="58" stroke="#A33B3B" stroke-dasharray="4 3"/>
+        <g fill="none" stroke="#141413" stroke-width="0.75"><rect x="40" y="10" width="18" height="12"/><rect x="74" y="10" width="18" height="12"/><rect x="108" y="10" width="18" height="12"/><rect x="142" y="10" width="18" height="12"/><rect x="176" y="10" width="18" height="12"/><rect x="210" y="10" width="18" height="12"/></g>
+        <g fill="#C9A82D" stroke="#141413"><polygon points="36,44 41,54 31,54"/><polygon points="244,44 249,54 239,54"/><polygon points="36,118 41,128 31,128"/><polygon points="244,118 249,128 239,128"/></g>
+        <text x="200" y="146" font-size="10" fill="#5E5D59" font-family="Consolas,Menlo,monospace">EL. 152.60</text>
+      </svg>
+      <h4 class="lead">B · 토층 단면 (벽)</h4>
+      <ul class="plain">
+        <li>벽과 나란히 2~3줄, 줄마다 높이를 달리. 옆 겹침 80 %. 양 끝에 사선 몇 장.</li>
+        <li>벽면 표지 4개(네 모서리) + 수평실 높이 표지 2개. 단면선 끝점은 기준점과 같게.</li>
+        <li>벽을 정리한 뒤 마르기 전에 바로 찍습니다(흙색 차이가 가장 잘 보일 때).</li>
+      </ul>
+    </div>
+    <div>
+      <svg viewBox="0 0 280 150" width="100%" style="border-top:1px solid var(--ink); border-bottom:1px solid var(--line); background:var(--surface)">
+        <ellipse cx="140" cy="112" rx="80" ry="18" fill="#F0EEE6" stroke="#141413"/>
+        <path d="M118 108 C110 80 116 60 128 52 L152 52 C164 60 170 80 162 108 Z" fill="#9A7B55" stroke="#141413"/>
+        <g fill="none" stroke="#5E5D59" stroke-dasharray="2 3"><ellipse cx="140" cy="80" rx="118" ry="30"/><ellipse cx="140" cy="60" rx="100" ry="22"/></g>
+        <g fill="#fff" stroke="#141413"><circle cx="80" cy="114" r="4"/><circle cx="200" cy="114" r="4"/></g><line x1="84" y1="114" x2="196" y2="114" stroke="#141413" stroke-width="0.75"/>
+        <text x="8" y="16" font-size="11" fill="#5E5D59" font-family="Malgun Gothic,Apple SD Gothic Neo,sans-serif">회전판 · 3 높이</text>
+      </svg>
+      <h4 class="lead">C · 유물</h4>
+      <ul class="plain">
+        <li>회전판 10°~15° 간격 × 높이 3단(낮게 · 중간 · 높게). 뒤집어 한 번 더.</li>
+        <li>축척자 2개를 회전판 위에. 색표. 무늬 없는 배경으로 「가리기」 배경 자동이 잘 되게.</li>
+        <li>초점 쌓기(포커스 스태킹) 사진은 형상이 틀어지므로 쓰지 않습니다. 조리개를 조여 깊이를 확보합니다.</li>
+      </ul>
+    </div>
+    <div>
+      <svg viewBox="0 0 280 150" width="100%" style="border-top:1px solid var(--ink); border-bottom:1px solid var(--line); background:var(--surface)">
+        <polygon points="40,30 240,22 252,128 30,136" fill="#F7F5EE" stroke="#D97757" stroke-width="2"/>
+        <path d="M50 40 H230 M230 40 V58 M230 58 H50 M50 58 V76 M50 76 H230 M230 76 V94 M230 94 H50 M50 94 V112 M50 112 H230" fill="none" stroke="#141413" stroke-width="0.75"/>
+        <g fill="#C9A82D" stroke="#141413"><polygon points="40,26 45,36 35,36"/><polygon points="240,18 245,28 235,28"/><polygon points="252,124 257,134 247,134"/><polygon points="30,132 35,142 25,142"/><polygon points="140,74 145,84 135,84"/></g>
+        <text x="8" y="16" font-size="11" fill="#5E5D59" font-family="Malgun Gothic,Apple SD Gothic Neo,sans-serif">격자 비행</text>
+      </svg>
+      <h4 class="lead">D · 조사구역 (드론)</h4>
+      <ul class="plain">
+        <li>격자 비행 앞뒤 80 % · 옆 70 %, 사선 비행 한 번 더.</li>
+        <li>기준점 5개 이상(가장자리 + 가운데), 검사점 3개 이상.</li>
+        <li>RTK를 쓰면 사진 위치 정확도를 함께 기록합니다(정렬 가중치로 씀).</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="heading">하지 말 것</h3>
+  <table class="t3 dense">
+    <tr><th style="width:260px">하지 말 것</th><th>까닭</th><th style="width:300px">AGI가 하는 일</th></tr>
+    <tr><td>찍는 중에 줌 · 초점 바꾸기</td><td>한 묶음 안에서 카메라 보정값이 하나여야 정밀도가 나옵니다</td><td>사진 정보에서 초점거리가 바뀌면 「사진 검사」가 알림</td></tr>
+    <tr><td>사진 자르기 · 보정 · 회전 저장 후 넣기</td><td>주점과 왜곡 계산이 틀어집니다</td><td>크기가 다른 사진은 넣을 때 알림</td></tr>
+    <tr><td>강한 압축 JPEG</td><td>표지 가운데 찾기가 흐려집니다</td><td>RAW 또는 최고 화질 JPEG 권장 문구</td></tr>
+    <tr><td>반쪽 그림자 · 움직이는 사람</td><td>짝 찾기가 틀리고 정사에 얼룩</td><td>「가리기」로 빼고 처리 기록지에 장수 기록</td></tr>
+  </table>
+</div></section>
+
+<!-- ============================== 07 양식 ============================== -->
+<section class="sheet" id="s7"><div class="inner">
+  <div class="secno">07</div>
+  <h2 class="title">양식</h2>
+  <p class="lead">네 가지 양식을 씁니다. ①②는 현장에서 적고 AGI가 사진 정보와 좌표 파일로 채워 줍니다. ③④는 AGI가 처리할 때 스스로 만듭니다. 모두 종이(모서리 0 · 먹 테두리 · 삼선표)로 찍혀 보고서 부록에 그대로 들어갑니다.</p>
+  <div class="desk">
+    <div class="cols two">
+      <div class="paper onDesk">
+        <div class="ph">사진측량 촬영 기록지</div>
+        <div class="ps">① 현장 기록 · 사진 정보로 자동 채움</div>
+        <div class="formgrid">
+          <div class="lab">조사명</div><div>광령리1</div><div class="lab">유구 · 대상</div><div>1호 주거지</div>
+          <div class="lab">촬영일</div><div class="mono">2026-10-03</div><div class="lab">촬영자</div><div>권영인</div>
+          <div class="lab">날씨 · 빛</div><div>흐림, 그늘막</div><div class="lab">카메라</div><div class="muted">사진 정보에서 자동</div>
+        </div>
+        <table class="t3 dense" style="margin-top:12px">
+          <tr><th>묶음</th><th>사진 번호</th><th class="num">장수</th><th class="num">초점</th><th class="num">거리</th><th class="num">GSD</th><th class="num">겹침</th><th>색표</th></tr>
+          <tr><td>평면</td><td class="mono">DSC_0301–0396</td><td class="num">96</td><td class="num">35 mm</td><td class="num">1.6 m</td><td class="num">0.18 mm</td><td class="num">80/60</td><td>첫 장</td></tr>
+          <tr><td>북벽</td><td class="mono">DSC_0410–0441</td><td class="num">32</td><td class="num">35 mm</td><td class="num">1.2 m</td><td class="num">0.13 mm</td><td class="num">80</td><td>첫 장</td></tr>
+          <tr><td>보충</td><td class="mono">DSC_0560–0579</td><td class="num">20</td><td class="num">35 mm</td><td class="num">2.4 m</td><td class="num">0.27 mm</td><td class="num">—</td><td>—</td></tr>
+        </table>
+        <div class="leader"><span class="l">비고</span><span class="d"></span><span>평면 묶음에 사선 고리 2바퀴 포함</span></div>
+      </div>
+      <div class="paper onDesk">
+        <div class="ph">기준점 · 검사점 측량 기록지</div>
+        <div class="ps">② 좌표 파일(CSV)로 불러옴</div>
+        <div class="formgrid">
+          <div class="lab">측지기준</div><div>세계측지계 (GRS80)</div><div class="lab">투영</div><div>TM 중부원점 · <span class="mono">EPSG:5186</span></div>
+          <div class="lab">측량 기기</div><div>토탈스테이션</div><div class="lab">측량자 · 일시</div><div>권영인 · <span class="mono">2026-10-03</span></div>
+        </div>
+        <table class="t3 dense" style="margin-top:12px">
+          <tr><th>점</th><th>쓰임</th><th class="num">X (동)</th><th class="num">Y (북)</th><th class="num">Z</th><th class="num">정확도</th><th>표지</th></tr>
+          <tr><td class="mono">GCP1</td><td>기준점</td><td class="num">147,962.418</td><td class="num">98,131.207</td><td class="num">152.36</td><td class="num">±3 mm</td><td class="mono">T01</td></tr>
+          <tr><td class="mono">GCP2</td><td>기준점</td><td class="num">148,021.774</td><td class="num">98,128.560</td><td class="num">151.82</td><td class="num">±3 mm</td><td class="mono">T02</td></tr>
+          <tr><td class="mono">GCP3</td><td>기준점</td><td class="num">148,026.093</td><td class="num">98,181.945</td><td class="num">153.10</td><td class="num">±3 mm</td><td class="mono">T03</td></tr>
+          <tr><td class="mono">GCP4</td><td>기준점</td><td class="num">147,958.650</td><td class="num">98,186.312</td><td class="num">153.74</td><td class="num">±3 mm</td><td class="mono">T04</td></tr>
+          <tr><td class="mono">CP1</td><td>검사점</td><td class="num">147,990.112</td><td class="num">98,154.880</td><td class="num">151.94</td><td class="num">±3 mm</td><td class="mono">T05</td></tr>
+          <tr><td class="mono">CP2</td><td>검사점</td><td class="num">147,996.540</td><td class="num">98,161.305</td><td class="num">152.08</td><td class="num">±3 mm</td><td class="mono">T06</td></tr>
+        </table>
+        <p class="muted" style="font-size:11px; margin:0">기준점 좌표는 Strata 표본 조사와 같은 값입니다. 검사점 좌표는 견본입니다.</p>
+      </div>
+      <div class="paper onDesk" style="grid-column:1 / -1">
+        <div class="ph">사진측량 처리 기록지</div>
+        <div class="ps">③ AGI가 처리할 때마다 자동으로 쓰고, 「검수 · 제출」에서 PDF로 냅니다</div>
+        <div class="formgrid">
+          <div class="lab">프로그램</div><div>AGI <span class="mono">0.2.0</span> · 엔진 지문 <span class="mono">9f3c…e1a0</span></div><div class="lab">처리일 · 처리자</div><div><span class="mono">2026-10-03</span> · 권영인</div>
+          <div class="lab">작업 좌표계</div><div><span class="mono">EPSG:5186</span> 중부원점</div><div class="lab">설정 지문</div><div class="mono">align:std seed:20261003</div>
+        </div>
+        <div class="cols two" style="margin-top:12px; gap:24px">
+          <div>
+            <div class="capline">사진</div>
+            <div class="leader"><span class="l">넣은 사진</span><span class="d"></span><span class="v">148</span><span class="u">장</span></div>
+            <div class="leader"><span class="l">정렬한 사진</span><span class="d"></span><span class="v">146</span><span class="u">장</span></div>
+            <div class="leader"><span class="l">뺀 사진</span><span class="d"></span><span>DSC_0412 흐림 · DSC_0577 겹침 부족</span></div>
+            <div class="capline">카메라 보정 (자가 보정)</div>
+            <table class="t3 dense">
+              <tr><th>항목</th><th class="num">값</th><th class="num">σ</th></tr>
+              <tr><td class="mono">f</td><td class="num">7,453.12 px</td><td class="num">0.41</td></tr>
+              <tr><td class="mono">cx · cy</td><td class="num">−12.40 · 8.91 px</td><td class="num">0.22 · 0.21</td></tr>
+              <tr><td class="mono">k1 · k2 · k3</td><td class="num">−0.0412 · 0.0861 · −0.0213</td><td class="num">0.0003 · 0.0011 · 0.0019</td></tr>
+              <tr><td class="mono">p1 · p2</td><td class="num">0.00021 · −0.00008</td><td class="num">0.00002 · 0.00002</td></tr>
+            </table>
+          </div>
+          <div>
+            <div class="capline">기준점 오차 (계산에 넣은 점)</div>
+            <table class="t3 dense">
+              <tr><th>점</th><th class="num">dX mm</th><th class="num">dY mm</th><th class="num">dZ mm</th><th class="num">사진</th></tr>
+              <tr><td class="mono">GCP1</td><td class="num">1.2</td><td class="num">−0.8</td><td class="num">1.9</td><td class="num">14</td></tr>
+              <tr><td class="mono">GCP2</td><td class="num">−1.4</td><td class="num">1.3</td><td class="num">−2.6</td><td class="num">11</td></tr>
+              <tr><td class="mono">GCP3</td><td class="num">0.6</td><td class="num">1.1</td><td class="num">1.0</td><td class="num">12</td></tr>
+              <tr><td class="mono">GCP4</td><td class="num">−0.4</td><td class="num">−1.6</td><td class="num">−0.7</td><td class="num">13</td></tr>
+            </table>
+            <div class="capline">검사점 오차 (계산에 넣지 않은 점)</div>
+            <table class="t3 dense">
+              <tr><th>점</th><th class="num">dX mm</th><th class="num">dY mm</th><th class="num">dZ mm</th><th class="num">사진</th></tr>
+              <tr><td class="mono">CP1</td><td class="num">1.1</td><td class="num">−1.2</td><td class="num">2.9</td><td class="num">9</td></tr>
+              <tr><td class="mono">CP2</td><td class="num">−1.8</td><td class="num">0.9</td><td class="num">−2.4</td><td class="num">10</td></tr>
+              <tr><td>제곱평균제곱근</td><td class="num">1.5</td><td class="num">1.1</td><td class="num">2.7</td><td class="num"></td></tr>
+            </table>
+            <div class="leader"><span class="l">축척자 오차 (2개)</span><span class="d"></span><span class="v">0.21 · 0.34</span><span class="u">mm</span></div>
+          </div>
+        </div>
+        <p class="muted" style="font-size:11px; margin:8px 0 0">런던 헌장(2009)의 투명성 원칙에 따라, 결과를 만든 설정과 판단(뺀 사진과 까닭)을 함께 남깁니다. 숫자는 견본입니다.</p>
+      </div>
+      <div class="paper onDesk" style="grid-column:1 / -1">
+        <div class="ph">성과품 목록</div>
+        <div class="ps">④ 제출 꾸러미 안의 MANIFEST.sha256 과 같은 내용</div>
+        <table class="t3 dense">
+          <tr><th>파일</th><th>내용</th><th>좌표계</th><th class="num">크기</th><th>SHA-256 (앞 12자)</th></tr>
+          <tr><td class="mono">평면정사_1호주거지_0.5mm.tif</td><td>평면 정사영상 + 월드 파일</td><td class="mono">5186 · 5179</td><td class="num">148 MB</td><td class="mono">3a91c0d24f7e</td></tr>
+          <tr><td class="mono">단면정사_A-A_북벽.tif</td><td>단면 정사영상 (연직면 좌표)</td><td>단면 좌표</td><td class="num">41 MB</td><td class="mono">b20e7c19a6d3</td></tr>
+          <tr><td class="mono">모델_1호주거지.obj</td><td>3D 모델 + 질감 + 좌표 이동값</td><td class="mono">5186 − 이동값</td><td class="num">412 MB</td><td class="mono">5c7d1e0b9a22</td></tr>
+          <tr><td class="mono">등고선_2cm.shp</td><td>등고선 (SHP · DXF)</td><td class="mono">5179</td><td class="num">2 MB</td><td class="mono">e81f40c3d5b7</td></tr>
+          <tr><td class="mono">처리기록지.pdf</td><td>③ 양식</td><td>—</td><td class="num">1 MB</td><td class="mono">07ab9e3f12c4</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ============================== 08 엔진 설계 ============================== -->
+<section class="sheet" id="s8"><div class="inner">
+  <div class="secno">08</div>
+  <h2 class="title">엔진 설계</h2>
+  <p class="lead">엔진은 화면과 떨어진 Rust 라이브러리 묶음입니다(Strata의 <span class="mono">ka_core</span>와 같은 규칙: 엔진에는 창 코드가 없습니다). 화면 · 명령줄 · 시험이 같은 엔진을 부릅니다.</p>
+
+  <h3 class="heading">처리 흐름</h3>
+  <table class="t3">
+    <tr><th style="width:28px" class="num">#</th><th style="width:150px">단계</th><th style="width:170px">크레이트</th><th>방법</th><th style="width:300px">통과 시험 (합성 장면 또는 기준 자료)</th></tr>
+    <tr><td class="num">1</td><td>사진 읽기 · 검사</td><td class="mono">agi-io</td><td>사진 정보(EXIF) · 센서 크기 표 · 선명도(라플라시안 분산) · 노출</td><td>알려진 사진 묶음에서 초점거리 · 크기 읽기 100 %</td></tr>
+    <tr><td class="num">2</td><td>특징점</td><td class="mono">agi-features</td><td>SIFT(Lowe 2004) + RootSIFT, 흙처럼 무늬 약한 면을 위해 대비 문턱 자동 조절</td><td>회전 · 축척 바꾼 합성 사진에서 반복률 기준 이상</td></tr>
+    <tr><td class="num">3</td><td>짝 찾기 · 검증</td><td class="mono">agi-match</td><td>근사 최근접(KD 트리) + 비율 시험 + 양방향 확인, 5점 본질 행렬(Nistér 2004) + RANSAC 변형(고정 씨앗)</td><td>합성 장면에서 바른 짝 비율 · 같은 씨앗이면 같은 결과</td></tr>
+    <tr><td class="num">4</td><td>정렬</td><td class="mono">agi-sfm</td><td>점진 정렬(Schönberger &amp; Frahm 2016 방식): 첫 짝 → PnP로 한 장씩 → 삼각측량</td><td>잡음 없는 합성 장면 재투영 오차 &lt; 0.01 px</td></tr>
+    <tr><td class="num">5</td><td>번들 조정 · 자가 보정</td><td class="mono">agi-ba</td><td>희소 Levenberg–Marquardt + Schur 보완. 카메라 모형 Brown–Conrady(f · cx · cy · k1–k4 · p1 · p2) + 비대칭 b1 · b2 + 롤링 셔터(선택). 공분산 계산</td><td>잡음 0.5 px 합성 장면에서 카메라 · 점 오차가 이론 공분산 안</td></tr>
+    <tr><td class="num">6</td><td>표지 · 기준점 · 축척자</td><td class="mono">agi-markers</td><td>원형 코드 타깃(타원 맞춤, 중심 편향 보정) · AprilTag(Olson 2011) · 화면에서 찍은 점 0.1 px 다듬기. 기준점 · 축척자를 정확도 가중으로 번들 조정에 넣음. 검사점은 넣지 않음</td><td>합성 표지 중심 오차 &lt; 0.05 px, 기준점 하나씩 빼고 다시 계산(LOO) 결과 기록</td></tr>
+    <tr><td class="num">7</td><td>점군</td><td class="mono">agi-mvs</td><td>PatchMatch 다시점 스테레오(Schönberger 외 2016 방식) + 기하 일관성 거르기, GPU(wgpu)와 CPU(rayon) 같은 결과</td><td>합성 깊이 장면 깊이 오차 · GPU와 CPU 결과 차이 한도</td></tr>
+    <tr><td class="num">8</td><td>점별 정밀도</td><td class="mono">agi-ba · agi-mvs</td><td>번들 조정 공분산 전파 + 몬테카를로(James 외 2017 방식)로 점마다 σx · σy · σz</td><td>몬테카를로 반복 수에 따른 수렴 확인</td></tr>
+    <tr><td class="num">9</td><td>면 · 질감</td><td class="mono">agi-mesh · agi-texture</td><td>Screened Poisson(Kazhdan &amp; Hoppe 2013) · 높이면 모드(지형) · 시점 고르기 + 이음매 색 맞춤 · 색표 보정</td><td>기준 스캔과 거리(중앙값 · 95 %)</td></tr>
+    <tr><td class="num">10</td><td>DEM · 정사</td><td class="mono">agi-ortho</td><td>격자 DEM, 참 정사(가림 판정 후 가장 곧게 본 사진 고르기), GeoTIFF 좌표 정보</td><td>정사 위 검사점 위치 오차 ≤ §06 목표</td></tr>
+    <tr><td class="num">11</td><td>단면 정사</td><td class="mono">agi-ortho</td><td>단면선 A–A′의 연직면에 두께(±) 안의 점 · 면을 투영, 표고 · 거리 좌표</td><td>합성 벽 장면에서 표고 눈금 오차 &lt; GSD</td></tr>
+    <tr><td class="num">12</td><td>등고선 · 선</td><td class="mono">agi-ortho · agi-vector</td><td>마칭 스퀘어 등고선, 사람이 따는 선(Strata 그리기 규칙)</td><td>합성 원뿔 DEM 등고선 반지름 오차</td></tr>
+    <tr><td class="num">13</td><td>검수 · 기록 · 꾸러미</td><td class="mono">agi-check · agi-report · agi-export</td><td>§07 ③ 처리 기록지, 검사 규칙, 5179 변환, MANIFEST.sha256</td><td>Strata 제출 꾸러미 검사기로 통과</td></tr>
+  </table>
+
+  <h3 class="heading">정밀도 규칙 (엔진 전부에 적용)</h3>
+  <ol class="plain">
+    <li><b>계산은 64비트 실수.</b> 좌표 · 카메라 · 번들 조정은 <span class="mono">f64</span>. GPU 안에서만 <span class="mono">f32</span>를 쓰고, 그때는 아래 원점 이동 뒤 값만 넣습니다.</li>
+    <li><b>묶음 원점 이동.</b> <span class="mono">147,990 / 98,150 / 150</span> 같은 큰 좌표는 묶음 가운데를 빼고 계산한 뒤 저장할 때 되돌립니다. 큰 수에 작은 수를 더할 때 생기는 mm 손실을 막습니다.</li>
+    <li><b>관측마다 정확도.</b> 사진 위 점 · 표지 · 기준점 · 축척자 · 사진 위치(RTK)는 모두 σ를 가지고 그 가중으로 계산합니다.</li>
+    <li><b>검사점은 절대 계산에 넣지 않습니다.</b> 오차만 잽니다. 기준점은 하나씩 빼고 다시 계산한 값도 기록합니다.</li>
+    <li><b>보정 항목 과잉 막기.</b> 서로 강하게 얽힌 항목(상관 0.9 넘음)은 경고하고, 사진이 적으면 b1 · b2 · k4를 끄라고 권합니다.</li>
+    <li><b>같은 입력, 같은 결과.</b> 무작위는 고정 씨앗, 병렬 합산 순서 고정. 결과에 엔진 판과 설정 지문을 남깁니다.</li>
+    <li><b>점별 정밀도는 기본 결과.</b> 정밀도 색 보기와 정밀도 GeoTIFF를 냅니다.</li>
+    <li><b>원본 불변.</b> 사진은 읽기만 합니다. 가리기 · 색 보정은 옆 파일로.</li>
+  </ol>
+
+  <h3 class="heading">크레이트 지도</h3>
+  <table class="t3 dense">
+    <tr><th style="width:170px">크레이트</th><th>맡는 일</th><th style="width:120px">상태</th></tr>
+    <tr><td class="mono">agi-core</td><td>수학 형, 카메라 모형, 좌표계 5186 · 5187 · 5179 (TM 정·역 변환), 묶음 · 기준점 · 축척자 자료형</td><td>있음 · 시험 7</td></tr>
+    <tr><td class="mono">agi-cli</td><td>명령줄로 엔진 돌리기 · 시험 · 비교 시험 자동화</td><td>있음</td></tr>
+    <tr><td class="mono">agi-io</td><td>조사 파일(<span class="mono">.agi</span>), 사진 · EXIF, 가리기 파일, 원자적 저장</td><td>2단계</td></tr>
+    <tr><td class="mono">agi-features · agi-match</td><td>특징점 · 짝 찾기 · 기하 검증</td><td>2단계</td></tr>
+    <tr><td class="mono">agi-sfm · agi-ba</td><td>정렬 · 번들 조정 · 공분산</td><td>2단계</td></tr>
+    <tr><td class="mono">agi-markers</td><td>코드 타깃 · AprilTag · 점 다듬기</td><td>3단계</td></tr>
+    <tr><td class="mono">agi-gpu</td><td>wgpu 장치 · 계산 셰이더 공통 (Metal · Vulkan · DirectX 12)</td><td>4단계</td></tr>
+    <tr><td class="mono">agi-mvs · agi-mesh · agi-texture</td><td>점군 · 면 · 질감</td><td>4단계</td></tr>
+    <tr><td class="mono">agi-ortho · agi-vector</td><td>DEM · 정사 · 단면 · 등고선 · 선</td><td>5단계</td></tr>
+    <tr><td class="mono">agi-app</td><td>화면 (Slint + wgpu 3D 보기). 엔진은 이 크레이트를 모릅니다</td><td>6단계</td></tr>
+    <tr><td class="mono">agi-check · agi-report · agi-export</td><td>검수 · 처리 기록지 · 성과품 · 제출 꾸러미</td><td>7단계</td></tr>
+  </table>
+</div></section>
+
+<!-- ============================== 09 Agisoft 비교와 검증 ============================== -->
+<section class="sheet" id="s9"><div class="inner">
+  <div class="secno">09</div>
+  <h2 class="title">Agisoft 비교와 검증</h2>
+  <p class="lead">「Agisoft보다 낫다」는 말은 같은 사진 · 같은 기준점 · 같은 검사점으로 잰 숫자로만 합니다. 이기지 못한 자료도 함께 보고합니다.</p>
+
+  <h3 class="heading">반드시 갖출 것 (Metashape Pro에 있는 것)</h3>
+  <p class="muted" style="font-size:12px">이 Mac의 Metashape Pro 2.3.2 Python 모듈 목록에서 확인한 이름을 근거로 적었습니다 (2026-10-13 조사).</p>
+  <table class="t3 dense">
+    <tr><th>기능</th><th style="width:260px">Metashape에서의 이름</th><th style="width:120px">AGI 단계</th></tr>
+    <tr><td>사진 정렬 · 짝 고르기(위치 · 순서)</td><td class="mono">MatchPhotos · AlignCameras · ReferencePreselection</td><td>2단계</td></tr>
+    <tr><td>카메라 보정 형식 읽기 · 쓰기</td><td class="mono">CalibrationFormat (XML · OpenCV · Australis …)</td><td>2단계</td></tr>
+    <tr><td>코드 타깃 · AprilTag · 십자 표지</td><td class="mono">CircularTarget12–20bit · AprilTag* · CrossTarget</td><td>3단계</td></tr>
+    <tr><td>축척자 · 기준점 · 검사점 오차</td><td class="mono">Scalebar · Marker · Reference</td><td>3단계</td></tr>
+    <tr><td>점 거르기 · 최적화</td><td class="mono">FilterMode · OptimizeCameras</td><td>3단계</td></tr>
+    <tr><td>깊이 지도 · 점군 · 면 · 질감</td><td class="mono">BuildDepthMaps · BuildPointCloud · BuildModel · BuildTexture</td><td>4단계</td></tr>
+    <tr><td>DEM · 정사 · 등고선</td><td class="mono">BuildDem · BuildOrthomosaic · BuildContours</td><td>5단계</td></tr>
+    <tr><td>가리기 (배경 · 파일 · 모델)</td><td class="mono">MaskingMode*</td><td>2단계 · 4단계</td></tr>
+    <tr><td>내보내기 (TIFF · OBJ · PLY · LAS · DXF …)</td><td class="mono">Export* · ModelFormat* · PointCloudFormat*</td><td>7단계</td></tr>
+  </table>
+
+  <h3 class="heading">앞설 것 (고고학에서 중요한 것)</h3>
+  <table class="t3">
+    <tr><th style="width:190px">항목</th><th>AGI가 하는 것</th><th style="width:300px">확인 방법</th></tr>
+    <tr><td>검사점 오차</td><td>관측 가중 · 원점 이동 · 표지 중심 편향 보정 · 보정 항목 과잉 경고</td><td>B1–B5 자료에서 Metashape와 같은 조건 비교</td></tr>
+    <tr><td>점별 정밀도</td><td>공분산 전파 + 몬테카를로를 기본 결과로 (정밀도 색 · 정밀도 GeoTIFF)</td><td>반복 촬영 자료에서 실제 흩어짐과 비교</td></tr>
+    <tr><td>단면 정사</td><td>단면선 두 점으로 바로 연직면 정사 + 표고 눈금 + 도면</td><td>벽 자료 B3에서 표고 눈금 오차</td></tr>
+    <tr><td>처리 기록</td><td>§07 처리 기록지를 자동으로, 뺀 사진과 까닭까지</td><td>보고서 부록 그대로 쓸 수 있는지 조사원 확인</td></tr>
+    <tr><td>재현</td><td>고정 씨앗 · 엔진 지문, 같은 입력이면 같은 결과</td><td>같은 자료 3번 처리해 결과 파일 지문 비교</td></tr>
+    <tr><td>현장 말과 흐름</td><td>Strata와 같은 화면 · 같은 말 · 같은 제출 규격</td><td>Strata GUI 시나리오 서식으로 현장 기록</td></tr>
+  </table>
+
+  <h3 class="heading">비교 시험 절차</h3>
+  <table class="t3">
+    <tr><th style="width:50px">자료</th><th>내용</th><th style="width:330px">재는 것</th></tr>
+    <tr><td class="mono">B1</td><td>실내 표지판: 토탈스테이션으로 좌표를 잰 표지 30개 이상</td><td>검사점 오차(X · Y · Z), 축척자 오차, 재투영 오차</td></tr>
+    <tr><td class="mono">B2</td><td>유구 평면 (실제 현장 1곳)</td><td>검사점 오차, 정사 위 검사점 위치 오차</td></tr>
+    <tr><td class="mono">B3</td><td>토층 벽 (실제 현장 1곳)</td><td>단면 표고 눈금 오차, 검사점 오차</td></tr>
+    <tr><td class="mono">B4</td><td>유물 + 구조광 스캐너 기준 스캔</td><td>기준 스캔과 거리(중앙값 · 95 %), 빈 곳 비율</td></tr>
+    <tr><td class="mono">B5</td><td>드론 조사구역</td><td>검사점 오차, 처리 시간, 최대 메모리</td></tr>
+  </table>
+  <ul class="plain">
+    <li>두 프로그램 모두 같은 사진, 같은 기준점 · 검사점 나눔, 같은 수준의 보정 항목으로 처리합니다.</li>
+    <li>「앞선다」는 AGI의 검사점 오차가 더 작고, 그 차이가 같은 자료 3번 처리의 흩어짐의 2배보다 클 때만 씁니다.</li>
+    <li>결과는 자료마다 표로 남기고, 진 자료도 지우지 않습니다.</li>
+  </ul>
+  <div class="note"><span class="mk"><span class="tri"></span></span> 지금 이 Mac의 Metashape Pro는 실행하면 「No nodelocked license found」를 냅니다(2026-10-13 확인). 비교 시험을 하려면 라이선스가 있는 Metashape이나, Metashape로 처리한 결과 파일(보고서 · 카메라 XML · 검사점 표)이 필요합니다.</div>
+  <div class="note">리버스 엔지니어링(REA)은 <b>동작과 파일 형식을 비교</b>하는 데만 씁니다. Metashape의 코드 · 그림 · 자료를 AGI에 옮기지 않습니다. 알고리즘은 위에 적은 공개 논문을 근거로 직접 만듭니다.</div>
+</div></section>
+
+<!-- ============================== 10 파일과 자료 구조 ============================== -->
+<section class="sheet" id="s10"><div class="inner">
+  <div class="secno">10</div>
+  <h2 class="title">파일과 자료 구조</h2>
+  <div class="cols two">
+    <div>
+      <div class="capline">조사 폴더 (폴더째 옮기면 다른 PC에서도 열림)</div>
+<pre class="mono" style="font-size:12px; line-height:20px; margin:0; border-top:1px solid var(--ink); border-bottom:1px solid var(--ink); padding:8px 0">광령리1/
+├── 광령리1.agi          조사 파일 (SQLite)
+├── 사진/                원본 (읽기만)
+├── 가리기/              사진별 가리기 PNG
+├── 계산/                깊이 지도 · 임시 (지워도 다시 만듦)
+├── 성과/                정사 · 단면 · 모델 · DEM · 등고선
+└── 기록/                처리기록지.pdf · 처리기록.json</pre>
+      <p class="muted" style="font-size:12px; margin-top:8px">사진이 다른 곳에 있으면 조사 폴더 기준 상대 경로로 기억하고, 찾지 못하면 Strata처럼 「원본을 못 찾은 사진」 목록을 보여 줍니다.</p>
+    </div>
+    <div>
+      <div class="capline">조사 파일 안의 표</div>
+      <table class="t3 dense">
+        <tr><th style="width:120px">표</th><th>담는 것</th></tr>
+        <tr><td class="mono">survey</td><td>조사명 · 유구 · 작업 좌표계 · 원점 이동값</td></tr>
+        <tr><td class="mono">blocks</td><td>사진 묶음 (평면 · 북벽 …)</td></tr>
+        <tr><td class="mono">photos</td><td>경로 · 크기 · EXIF · 선명도 · 뺌 여부와 까닭</td></tr>
+        <tr><td class="mono">sensors</td><td>카메라 보정값 · σ · 상관</td></tr>
+        <tr><td class="mono">poses</td><td>사진 자리 · 방향 · 공분산</td></tr>
+        <tr><td class="mono">markers · marker_obs</td><td>표지 · 기준점 · 검사점, 사진 위 관측(x · y · σ)</td></tr>
+        <tr><td class="mono">scalebars</td><td>끝점 · 길이 · 정확도</td></tr>
+        <tr><td class="mono">tie_points</td><td>성긴 점 (묶음별 이진 덩어리)</td></tr>
+        <tr><td class="mono">products</td><td>성과 파일 경로 · 지문 · 해상도</td></tr>
+        <tr><td class="mono">runs</td><td>처리 기록: 단계 · 설정 지문 · 엔진 판 · 시작/끝 · 요약</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="capline">저장 규칙 (Strata와 같음)</div>
+  <ul class="plain">
+    <li>자동 저장 없음. 「저장」(<span class="mono">Ctrl+S</span>)이나 닫을 때 묻는 창에서만 저장합니다. 저장 안 된 변경이 있으면 제목 끝에 <span class="mono">*</span>.</li>
+    <li>저장은 원자적으로: 임시 파일에 쓰기 → 디스크에 맞추기(fsync) → 이름 바꾸기 → 폴더 맞추기. 중간에 꺼져도 앞 저장본이 남습니다.</li>
+    <li>오래 걸리는 계산 결과(깊이 지도 · 점군)는 <span class="mono">계산/ · 성과/</span>에 바로 쓰고 조사 파일에는 경로와 지문만 둡니다.</li>
+    <li>새 조사 · 다른 이름 저장은 늘 사용자의 조사 폴더에서 시작합니다(바탕 화면 아님).</li>
+  </ul>
+</div></section>
+
+<!-- ============================== 11 기술 결정 ============================== -->
+<section class="sheet" id="s11"><div class="inner">
+  <div class="secno">11</div>
+  <h2 class="title">기술 결정</h2>
+  <h3 class="heading">화면 도구: Slint + wgpu (권장)</h3>
+  <p>Strata는 C++ Qt로 만들었습니다. AGI는 Rust이므로 Rust 화면 도구 중에서 Strata 모양을 가장 정확하게 따라 할 수 있는 것을 고릅니다.</p>
+  <table class="t3">
+    <tr><th style="width:150px">후보</th><th>잘하는 것</th><th>걸리는 것</th><th style="width:110px">판단</th></tr>
+    <tr><td><b>Slint + wgpu</b></td><td>선언형으로 Strata 치수 · 색 · 1 px 선을 정확히 그림. 바탕 앱 창. 3D 보기를 wgpu로 그려 화면 안에 붙일 수 있음. 한 벌의 코드로 Mac · Windows</td><td>3D 보기 붙이는 기능은 착수 전에 1일 시험으로 확인해야 함</td><td>권장</td></tr>
+    <tr><td>Tauri (웹 화면)</td><td>이 설계도의 HTML/CSS를 거의 그대로 옮길 수 있음</td><td>수천만 점 3D 보기를 웹 화면 안에서 그리면 느리고, 바탕 wgpu 창을 겹치기 어려움</td><td>예비</td></tr>
+    <tr><td>egui</td><td>빠르게 만들기 쉬움</td><td>기본 모양이 게임 도구 같고, 한글 글자 · 정밀한 표 모양을 Strata처럼 맞추기 어려움</td><td>쓰지 않음</td></tr>
+    <tr><td>iced</td><td>Rust다운 구조</td><td>복잡한 표 · 창 · 3D 보기 조합에 손이 많이 감</td><td>쓰지 않음</td></tr>
+  </table>
+  <p class="muted" style="font-size:12px">1일 시험 통과 조건: ① wgpu로 그린 점 100만 개가 Slint 창 안에서 60 프레임으로 돎 ② 맑은 고딕 · Apple SD 산돌고딕 Neo 13 px가 Strata 캡처와 같은 선명도 ③ 1 px 선과 리본 치수가 이 설계도와 같음. 하나라도 안 되면 Tauri로 바꾸고 그 사실을 이 칸에 적습니다.</p>
+
+  <h3 class="heading">나머지 결정</h3>
+  <table class="t3 dense">
+    <tr><th style="width:170px">분야</th><th>고른 것</th><th>까닭</th></tr>
+    <tr><td>수학</td><td class="mono">nalgebra (f64) · faer (큰 희소 행렬)</td><td>순수 Rust, 번들 조정 크기에 맞음</td></tr>
+    <tr><td>병렬 · GPU</td><td class="mono">rayon · wgpu</td><td>Metal · Vulkan · DirectX 12 하나의 코드</td></tr>
+    <tr><td>사진 · TIFF</td><td class="mono">image · kamadak-exif · tiff</td><td>순수 Rust. GeoTIFF 좌표 정보는 직접 씀</td></tr>
+    <tr><td>조사 파일</td><td class="mono">rusqlite (SQLite 포함)</td><td>GeoPackage와 같은 저장 방식. SQLite만 C 코드이며 안전한 감싼 API로만 씀</td></tr>
+    <tr><td>PDF · DXF · LAS</td><td class="mono">krilla 또는 printpdf · 직접 DXF · las</td><td>처리 기록지 · 도판 PDF, 캐드 · 점군 내보내기</td></tr>
+    <tr><td>라이선스</td><td class="mono">MIT OR Apache-2.0</td><td>의존성은 MIT · Apache · BSD · ISC · zlib만. GPL 의존성은 넣기 전에 묻습니다</td></tr>
+  </table>
+</div></section>
+
+<!-- ============================== 12 개발 지침 ============================== -->
+<section class="sheet" id="s12"><div class="inner">
+  <div class="secno">12</div>
+  <h2 class="title">개발 지침</h2>
+  <p class="lead">저장소의 <span class="mono">CLAUDE.md · AGENTS.md · .agents/skills/</span>가 이 장을 따릅니다. 사용자는 고고학 현장 전문가이며, 빌드 · 시험 · 커밋은 개발 에이전트가 직접 하고 결과를 증거와 함께 보고합니다.</p>
+
+  <h3 class="heading">단계마다 쓰는 스킬</h3>
+  <table class="t3">
+    <tr><th style="width:190px">언제</th><th style="width:280px">스킬</th><th>남기는 것</th></tr>
+    <tr><td>현장 쓰임새를 물어야 하는 새 기능</td><td class="mono">superpowers:brainstorming</td><td>쓰임새 질문 4개 이하 + 추천 답</td></tr>
+    <tr><td>여러 단계짜리 기능</td><td class="mono">superpowers:writing-plans</td><td><span class="mono">docs/superpowers/plans/날짜-이름.md</span></td></tr>
+    <tr><td>계획 실행</td><td class="mono">superpowers:executing-plans</td><td>과제별 진행 표시</td></tr>
+    <tr><td>코드를 쓰거나 고칠 때</td><td class="mono">superpowers:test-driven-development</td><td>먼저 실패하는 시험 → 통과 → 정리</td></tr>
+    <tr><td>엔진 알고리즘</td><td class="mono">photogrammetry-rust-engine</td><td>§08 정밀도 규칙 확인</td></tr>
+    <tr><td>화면이 바뀔 때</td><td class="mono">strata-design-system</td><td>§02 점검표 + 기본 · 새 모양 캡처 2장</td></tr>
+    <tr><td>증상 · 오차 · 실패</td><td class="mono">superpowers:systematic-debugging</td><td>원인 → 재현 시험 → 고침</td></tr>
+    <tr><td>Metashape 동작 · 형식 비교</td><td class="mono">reverse-engineer-anything (REA MCP)</td><td>근거 기록 (코드 복제 금지)</td></tr>
+    <tr><td>기능 하나가 끝났을 때</td><td class="mono">superpowers:requesting-code-review</td><td>진짜 지적만 이번 변경에서 고침</td></tr>
+    <tr><td>끝났다고 말하기 전</td><td class="mono">superpowers:verification-before-completion</td><td><span class="mono">cargo test --workspace</span> 출력 붙임</td></tr>
+    <tr><td>브랜치 마무리</td><td class="mono">superpowers:finishing-a-development-branch</td><td>main에 합치고 push, CI 확인</td></tr>
+  </table>
+
+  <h3 class="heading">자동 검사</h3>
+  <table class="t3 dense">
+    <tr><th style="width:260px">장치</th><th>하는 일</th></tr>
+    <tr><td class="mono">.githooks/pre-commit</td><td><span class="mono">cargo fmt --check</span> → <span class="mono">cargo clippy --workspace -- -D warnings</span> → <span class="mono">cargo test --workspace</span>. 하나라도 실패하면 커밋을 막습니다</td></tr>
+    <tr><td class="mono">.claude/hooks/commit-gate.mjs</td><td>에이전트가 <span class="mono">git commit</span>을 부르기 전에 같은 검사</td></tr>
+    <tr><td class="mono">.agents/hooks.json</td><td>파일을 고친 뒤 <span class="mono">rustfmt</span>로 모양 맞춤</td></tr>
+    <tr><td class="mono">.agents/mcp_config.json</td><td>REA MCP 서버 (Metashape 비교용)</td></tr>
+    <tr><td class="mono">.github/workflows/ci.yml</td><td>macOS · Ubuntu · Windows에서 빌드 · 시험 · <span class="mono">agi-cli</span> 실행</td></tr>
+  </table>
+
+  <h3 class="heading">코드 규칙</h3>
+  <ul class="plain">
+    <li>엔진 크레이트는 화면을 모릅니다. <span class="mono">agi-app</span>만 엔진을 부릅니다.</li>
+    <li>엔진 크레이트 맨 위에 <span class="mono">#![forbid(unsafe_code)]</span>. 라이브러리 코드에서 <span class="mono">unwrap · expect · panic</span> 금지(clippy로 막음). 실패는 <span class="mono">Result</span>와 뜻이 분명한 오류형.</li>
+    <li>좌표 · 카메라 계산은 <span class="mono">f64</span>, 원점 이동 규칙(§08) 지킴. 무작위는 고정 씨앗.</li>
+    <li>오래 걸리는 계산은 진행 알림과 취소를 받습니다. 화면을 멈추지 않습니다.</li>
+    <li>사용자 글은 한국어 합니다체(§02 말 고르기), 코드 주석과 이름은 영어.</li>
+    <li>바뀐 줄은 모두 요청에서 바로 이어져야 합니다. 요청하지 않은 설정 · 추상화를 넣지 않습니다.</li>
+  </ul>
+
+  <h3 class="heading">시험 규칙</h3>
+  <ul class="plain">
+    <li><b>합성 장면:</b> 알고 있는 3D 점과 카메라로 사진 좌표를 만들고 잡음을 더해, 엔진이 되찾은 값이 한도 안인지 봅니다. 모든 알고리즘에 하나 이상.</li>
+    <li><b>왕복:</b> 좌표계 정·역 변환 mm 이내, 저장 → 열기 후 같은 값.</li>
+    <li><b>기준 자료:</b> 작은 실제 사진 묶음(공개 자료 또는 B1)을 별도로 받아 돌립니다. 저장소에 큰 파일을 넣지 않습니다.</li>
+    <li><b>바꾼 시험:</b> 기존 시험의 기댓값을 바꾸거나 지우면 커밋 메시지에 <span class="mono">시험 변경: 까닭</span>을 쓰고 보고 맨 위에 알립니다.</li>
+  </ul>
+
+  <h3 class="heading">완료의 정의</h3>
+  <table class="t3 dense">
+    <tr><th style="width:28px" class="num">#</th><th>확인</th></tr>
+    <tr><td class="num">1</td><td>시험을 먼저 썼고, 고치기 전에 실패하는 것을 봤다</td></tr>
+    <tr><td class="num">2</td><td><span class="mono">cargo fmt --check · clippy -D warnings · test --workspace</span> 모두 통과 (출력 첨부)</td></tr>
+    <tr><td class="num">3</td><td>CI 세 운영체제 통과</td></tr>
+    <tr><td class="num">4</td><td>새 설정 · 새 결과는 처리 기록지에 기록된다</td></tr>
+    <tr><td class="num">5</td><td>화면이면 §02 점검표 통과 + 두 모양 캡처</td></tr>
+    <tr><td class="num">6</td><td>이 설계도의 해당 칸(§04 명세 · §13 진행)을 고쳤다</td></tr>
+  </table>
+</div></section>
+
+<!-- ============================== 13 제작 계획 ============================== -->
+<section class="sheet" id="s13"><div class="inner">
+  <div class="secno">13</div>
+  <h2 class="title">제작 계획</h2>
+  <p class="lead">단계마다 「관문」을 통과해야 다음으로 갑니다. 관문은 모두 잴 수 있는 것입니다.</p>
+  <table class="t3">
+    <tr><th style="width:72px">단계</th><th style="width:190px">만드는 것</th><th>관문</th><th style="width:110px">상태</th></tr>
+    <tr><td class="mono">1</td><td>기반: agi-core · CI</td><td>좌표계 왕복 mm 이내, 카메라 투영 시험, 세 운영체제 CI 통과</td><td><span class="mk"><svg class="g" style="color:var(--done)"><use href="#i-check"/></svg>끝</span></td></tr>
+    <tr><td class="mono">2</td><td>정렬: agi-io · features · match · sfm · ba + 화면 도구 1일 시험</td><td>잡음 없는 합성 장면 재투영 &lt; 0.01 px, 잡음 0.5 px에서 공분산 안, 공개 사진 묶음 정렬 성공, Slint 시험 3조건</td><td><span class="dot"></span>다음</td></tr>
+    <tr><td class="mono">3</td><td>기준점 · 표지 · 축척자 · 최적화</td><td>B1 검사점 오차 기록, Metashape 첫 비교 표</td><td class="muted">예정</td></tr>
+    <tr><td class="mono">4</td><td>점군 · 면 · 질감 · 점별 정밀도 (GPU)</td><td>B4 기준 스캔 거리, GPU · CPU 결과 차이 한도</td><td class="muted">예정</td></tr>
+    <tr><td class="mono">5</td><td>DEM · 정사 · 단면 · 등고선</td><td>정사 위 검사점 위치 오차 ≤ §06 목표, B3 표고 눈금 오차 &lt; GSD</td><td class="muted">예정</td></tr>
+    <tr><td class="mono">6</td><td>화면: 홈 · 모델 · 사진 · 정사 · 단면 · 창</td><td>§02 점검표, 두 모양 캡처, Strata와 나란히 비교</td><td class="muted">예정</td></tr>
+    <tr><td class="mono">7</td><td>처리 기록지 · 검수 · 제출 꾸러미</td><td>Strata 제출 규격 통과, MANIFEST 검증</td><td class="muted">예정</td></tr>
+    <tr><td class="mono">8</td><td>비교 시험 · 현장 시험</td><td>B1–B5 비교 보고서, 현장 조사원 시나리오 기록</td><td class="muted">예정</td></tr>
+  </table>
+  <div class="note">이 설계도는 <span class="mono">docs/blueprint/index.html</span> 한 파일입니다. 인터넷 없이 열리고, 위 「화면 보기」로 두 모양을 바꿔 볼 수 있습니다. 단계가 끝날 때마다 §04 · §13을 고치고 판(v)을 올립니다.</div>
+</div></section>
+
+</main>
+</div>
+
+<script>
+/* ======================================================================
+   한 벌의 자료: 리본 칩. 리본 그림과 §04 명세 표가 모두 여기서 나온다.
+   ====================================================================== */
+const RIBBON = [
+ {id:'survey', cap:'조사', chips:[
+  {id:'new', ico:'file-plus', lab:'새 조사', key:'Ctrl+N', when:'늘', act:'「새 조사」 창 (M 560): 조사명 · 유구 · 작업 좌표계(경도 눈금자) · 폴더', res:'폴더에 <span class="mono">조사명.agi</span>를 만들고 모델 탭을 빈 상태로 엶', eng:'agi_io::Survey::create'},
+  {id:'open', ico:'folder', lab:'열기', key:'Ctrl+O', when:'늘', act:'파일 고르기 (<span class="mono">*.agi</span>), 저장 안 된 조사가 있으면 먼저 물음', res:'마지막 보기 · 작업 목록 · 처리 기록을 그대로 복원. 못 찾은 사진은 목록으로 알림', eng:'agi_io::Survey::open'},
+  {id:'save', ico:'save', lab:'저장', key:'Ctrl+S', when:'바뀐 것이 있을 때', act:'창 없음. 임시 파일 쓰기 → fsync → 이름 바꾸기', res:'제목 끝 <span class="mono">*</span>와 상태줄 「저장 안 됨」 칸이 사라지고 탭 끝이 「저장됨」', eng:'agi_io::Survey::save_atomic'},
+  {id:'saveas', ico:'save-pen', lab:'다른 이름', key:'Ctrl+Shift+S', when:'조사 열림', act:'폴더 고르기 (조사 폴더에서 시작). 사진은 복사할지 경로만 둘지 물음', res:'새 조사 폴더로 전환, 원래 조사는 그대로', eng:'agi_io::Survey::save_as'}
+ ]},
+ {id:'photo', cap:'사진', chips:[
+  {id:'add', ico:'image', lab:'사진 넣기', key:'Ctrl+I', when:'조사 열림', act:'파일 · 폴더 고르기 → 사진 묶음 고르기(평면 · 북벽 · 새 묶음)', res:'사진 목록에 추가. 사진 정보(초점거리 · 센서 · 시각 · GPS)를 읽고 같은 카메라끼리 보정 묶음을 만듦', eng:'agi_io::import_photos · exif'},
+  {id:'check', ico:'scan', lab:'사진 검사', key:'—', when:'사진 1장 이상', act:'창 없음. 뒤에서 선명도 · 노출 · 초점거리 바뀜 · 크기 다름을 셈', res:'사진 띠에 선명도 숫자, 흐린 사진에 「흐림」과 「빼기」 제안. 빼는 것은 사람이 정함', eng:'agi_io::quality'},
+  {id:'mask', ico:'square-dashed', lab:'가리기', key:'Ctrl+M', tool:1, when:'사진 1장 이상', act:'도구 줄 「가리기 ›」 (붓 · 지우개 · 다각형 · 배경 자동)', res:'가린 곳은 정렬 · 점군에서 빠짐. 원본은 그대로, 가리기 파일은 <span class="mono">가리기/</span>', eng:'agi_io::mask'}
+ ]},
+ {id:'align', cap:'정렬', chips:[
+  {id:'align', ico:'ka-align', lab:'정렬', key:'Ctrl+R', when:'한 묶음에 사진 2장 이상', act:'「사진 정렬」 창 (M 560): 정밀도 · 짝 찾기 · 카메라 보정 항목 · 같은 결과 다시 얻기', res:'뒤에서 계산(진행 막대 + 단계 이름). 끝나면 「정렬 결과」 창(L 860): 맞춘 사진 수 · 재투영 오차 · 빠진 사진과 까닭', eng:'agi_features → agi_match → agi_sfm::align'},
+  {id:'gcp', ico:'locate-fixed', lab:'기준점', key:'Ctrl+G', tool:1, when:'사진 1장 이상 (정렬 전에도 찍을 수 있음)', act:'도구 줄 「기준점 ›」 + 사진 탭으로 이동, 확대경 켜짐', res:'사진마다 찍은 점 저장. 정렬 뒤에는 다른 사진에 자리를 제안하고 확인만 받음', eng:'agi_markers::observe · agi_sfm::project'},
+  {id:'target', ico:'target', lab:'타깃', key:'Ctrl+T', when:'사진 1장 이상', act:'「타깃 찾기」 창 (S 440): 종류(원형 12 · 14 · 16 · 20비트 / AprilTag / 십자) · 허용 오차', res:'모든 사진에서 표지를 찾아 <span class="mono">T01…</span> 이름을 붙임. 기준점 파일과 이름이 맞으면 자동 연결', eng:'agi_markers::detect'},
+  {id:'scale', ico:'ruler', lab:'축척자', key:'Ctrl+K', tool:1, when:'표지 2개 이상', act:'도구 줄 「축척자 ›」: 끝점 두 개 → 길이 · 정확도 입력', res:'축척자 목록에 추가. 최적화 뒤 오차 표시', eng:'agi_ba::ScaleBar'},
+  {id:'filter', ico:'funnel', lab:'점 거르기', key:'—', when:'정렬 끝', act:'「점 거르기」 창 (S 440): 기준(재투영 오차 · 본 사진 수 · 기하 불확실성) · 문턱값 · 지울 점 수 미리 보기', res:'고른 성긴 점을 지움 (되돌리기 됨). 지운 수는 처리 기록지에', eng:'agi_sfm::filter_points'},
+  {id:'optimize', ico:'sliders', lab:'최적화', key:'—', when:'기준점 3개 이상이 각각 사진 2장 이상에, 또는 축척자 1개 이상', act:'「최적화」 창 (S 440): 보정 항목 확인 · 검사점 제외 확인', res:'카메라 · 성긴 점 다시 계산. 기준점 · 검사점 오차 표와 상태줄 「검사점 오차」 갱신', eng:'agi_ba::adjust (가중 · 자가 보정)'}
+ ]},
+ {id:'build', cap:'복원', chips:[
+  {id:'dense', ico:'ka-cloud', lab:'점군', key:'Ctrl+Shift+D', when:'정렬 끝', act:'「점군 만들기」 창 (M 560): 품질(1/4 · 1/2 · 원본) · 깊이 거르기 · 점별 정밀도(추천)', res:'뒤에서 GPU 계산. 작업 목록 「점군」 줄과 3D 보기', eng:'agi_mvs::depth_maps · fuse'},
+  {id:'mesh', ico:'ka-mesh', lab:'면', key:'Ctrl+Shift+M', when:'점군 있음', act:'「면 만들기」 창 (S 440): 모양(지형 · 유구 = 높이면 / 유물 = 입체) · 면 수', res:'작업 목록 「면」 줄. 구멍 · 떠 있는 조각 수 표시', eng:'agi_mesh::poisson'},
+  {id:'texture', ico:'grid-3x3', lab:'질감', key:'—', when:'면 있음', act:'「질감 입히기」 창 (S 440): 크기(4096 · 8192) · 색표로 색 맞추기', res:'면에 사진 색. 색 보정 여부를 기록', eng:'agi_texture::bake'}
+ ]},
+ {id:'draw', cap:'도면화', chips:[
+  {id:'ortho', ico:'ka-ortho', lab:'정사', key:'Ctrl+Alt+O', when:'면 또는 DEM, 그리고 기준점 좌표 있음', act:'정사 탭 + 오른쪽 판(해상도 · 투영면 · 바탕 · 색)', res:'「정사 만들기」로 평면 정사영상. 도곽 띠 · 축척 막대 · 도북', eng:'agi_ortho::orthophoto'},
+  {id:'section', ico:'ka-section', lab:'단면', key:'Ctrl+Alt+S', tool:1, when:'면 또는 점군 있음', act:'도구 줄 「단면 ›」: 3D 보기나 정사 위에 단면선 두 점', res:'단면 탭: 연직면 단면 정사영상 + 표고 눈금 + 기준선', eng:'agi_ortho::section'},
+  {id:'dem', ico:'mountain', lab:'DEM', key:'—', when:'점군 또는 면 있음', act:'「수치표고」 창 (S 440): 해상도 · 빈 곳 메우기', res:'작업 목록 「DEM」 줄, 높이 색 보기', eng:'agi_ortho::dem'},
+  {id:'contour', ico:'ka-contour', lab:'등고선', key:'—', when:'DEM 있음', act:'「등고선」 창 (S 440): 간격(1 · 2 · 5 · 10 cm) · 계곡선 간격', res:'정사 · 도면 위 등고선 층 (SHP · DXF로 내보냄)', eng:'agi_ortho::contours'},
+  {id:'trace', ico:'pen-line', lab:'선 따기', key:'Ctrl+D', tool:1, when:'정사 또는 단면 있음', act:'도구 줄 「선 따기 ›」 (Strata 그리기 줄과 같은 순서 · 같은 키)', res:'유구 선 · 토층 선 · 유물 윤곽이 작업 목록 「도면 자료」에 쌓임', eng:'agi_vector::sketch'}
+ ]},
+ {id:'out', cap:'내보내기', chips:[
+  {id:'layout', ico:'file-text', lab:'도면', key:'Ctrl+L', when:'정사 또는 단면 있음', act:'도면 탭: A4 · A3 종이에 정사 · 단면 · 범례 · 표제란', res:'「PDF 내보내기」로 도판 PDF (Strata 도면과 같은 표제란 · 축척 막대)', eng:'agi_export::layout_pdf'},
+  {id:'print', ico:'printer', lab:'인쇄', key:'Ctrl+P', when:'도면 있음', act:'「도면 인쇄」 창 (L 860): 프린터 · 1:1 나눠 찍기 · 미리 보기', res:'인쇄 또는 나눈 장 PDF', eng:'agi_export::print'},
+  {id:'geotiff', ico:'map', lab:'GeoTIFF', key:'—', when:'정사 또는 DEM 있음', act:'「GeoTIFF 저장」 창 (S 440): 좌표계(작업 · 5179) · 무손실 압축', res:'좌표가 든 TIF + 월드 파일. Strata에 정합 없이 바로 올라감', eng:'agi_export::geotiff'},
+  {id:'model', ico:'box', lab:'모델', key:'—', when:'면 있음', act:'「3D 모델 저장」 창 (S 440): OBJ · PLY · glTF, 좌표 이동값', res:'모델 파일 + 좌표 이동값 글 파일', eng:'agi_export::mesh'},
+  {id:'submit', ico:'clipboard-list', lab:'검수·제출', key:'Ctrl+E', when:'조사 열림', act:'「검수 · 제출」 창 (820 × 580): 검사 항목 · 필수 성과품 줄 · 고치는 법', res:'「제출 꾸러미 만들기」: 성과 + 처리 기록지 PDF + MANIFEST.sha256. 오류가 남으면 한 번 묻고 README에 적음 (Strata와 같음)', eng:'agi_check · agi_report · agi_export::package'}
+ ]},
+ {id:'more', cap:'기타', chips:[
+  {id:'more', ico:'ellipsis', lab:'더보기', key:'—', when:'늘', act:'메뉴: 불러오기(기준점 CSV · 카메라 보정) · 화면(새 모양 · 고대비 · 큰 글씨) · 계산 장치 · 정보', res:'고른 일을 엶', eng:'—'}
+ ]}
+];
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const ic = (id, extra = '') => `<svg class="g" ${extra}><use href="#i-${id}"/></svg>`;
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim();
+function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* ---------------- 리본 ---------------- */
+function ribbonHTML(st = {}) {
+  let h = '<div class="ribbon">';
+  RIBBON.forEach(g => {
+    h += '<div class="rgrp"><div class="rchips">';
+    g.chips.forEach(c => {
+      let cls = 'chip';
+      if (c.id === 'save' && st.unsaved) cls += ' unsaved';
+      if (st.tool === c.id) cls += ' tool';
+      if (st.off && st.off.includes(c.id)) cls += ' off';
+      const tip = c.lab + (c.key && c.key !== '—' ? '  ' + c.key : '');
+      h += `<div class="${cls}" title="${tip}"><div class="tile">${ic(c.ico)}</div><div class="lab">${c.lab}</div></div>`;
+    });
+    const dim = st.dim && st.dim.includes(g.id);
+    h += `</div><div class="rcap${dim ? ' dim' : ''}">${g.cap}</div></div>`;
+  });
+  h += `<div class="rsearch"><div class="field">${ic('search')}<span>사진·점 찾기&nbsp;&nbsp;Ctrl+F</span></div></div></div>`;
+  return h;
+}
+function specHTML() {
+  let h = '<table class="t3 dense"><tr><th style="width:140px">칩</th><th style="width:104px">단축키</th><th style="width:190px">켜지는 때</th><th>누르면</th><th>끝나면</th><th style="width:190px">엔진</th></tr>';
+  let n = 0;
+  RIBBON.forEach(g => {
+    h += `<tr class="grp"><td colspan="6">${g.cap}</td></tr>`;
+    g.chips.forEach(c => {
+      n++;
+      h += `<tr><td><span style="display:inline-flex;align-items:center;gap:8px">${ic(c.ico)}${c.lab}</span>${c.tool ? '<div class="muted" style="font-size:11px">손에 드는 도구</div>' : ''}</td><td class="k">${c.key}</td><td>${c.when}</td><td>${c.act}</td><td>${c.res}</td><td class="mono" style="font-size:11px">${c.eng}</td></tr>`;
+    });
+  });
+  return h + `</table><p class="muted" style="font-size:12px">칩 ${n}개.</p>`;
+}
+
+/* ---------------- 색 견본 · 켜짐 ---------------- */
+const SW = [
+  ['ground','바탕 (리본 · 패널 · 창)'],['surface','입력 · 종이 · 뜬 것'],['wash','줄 올림 · 묶음 줄'],['desk','종이 뒤 · 페이지'],
+  ['press','눌림 · 표 줄 선'],['oat','켜짐 · 고름'],['ink','글자 · 먹선'],['muted','둘째 글자'],['faint','단위 · 흐림 (가장 옅은 글자)'],
+  ['line','영역 가는 선'],['edge','입력 · 단추 테두리'],['action','주 단추 하나'],['dot','손이 필요한 점'],['nextText','「다음」 「추천」'],
+  ['block','제출을 막는 것'],['caution','주의 삼각형'],['done','결과 통과 표시'],['tile','리본 타일'],['toolTile','손에 든 도구 타일'],['unsavedTile','저장 안 됨 타일'],['mapGround','3D · 정사 바탕']
+];
+function lum(hex) { const c = hex.replace('#',''); const v = [0,2,4].map(i => parseInt(c.substr(i,2),16)/255).map(x => x <= 0.04045 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4)); return 0.2126*v[0] + 0.7152*v[1] + 0.0722*v[2]; }
+function contrast(a, b) { const x = lum(a), y = lum(b); return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05); }
+function drawSwatches() {
+  const g = cssv('ground');
+  $('#swatches').innerHTML = SW.map(([n, role]) => { const v = cssv(n); return `<div class="s"><div class="chip" style="background:${v}"></div><div><div class="nm">${n}</div><div class="hx">${v.toUpperCase()}</div><div class="cr">${role} · <span class="mono">${contrast(v, g).toFixed(1)}:1</span></div></div></div>`; }).join('');
+}
+function drawOnStates() {
+  const chip = (cls, ico, lab, cap) => `<div style="text-align:center"><div class="chip ${cls}" style="margin:0 auto"><div class="tile">${ic(ico)}</div><div class="lab">${lab}</div></div><div class="spec">${cap}</div></div>`;
+  $('#onStates').innerHTML =
+    chip('', 'ka-align', '정렬', '평소') + chip('tool', 'locate-fixed', '기준점', '손에 든 도구') + chip('unsaved', 'save', '저장', '저장 안 됨') + chip('off', 'ka-ortho', '정사', '꺼짐 (점군 없음)') +
+    `<div><span class="tbtn shown">${ic('ka-cloud')}점군 보기</span><div class="spec">보이게 켬</div></div>` +
+    `<div><div class="vtabs" style="border:0;height:36px"><div class="vtab">${ic('house')}홈</div><div class="vtab cur">${ic('box')}모델</div></div><div class="spec">지금 보는 탭 (먹 밑줄 2 px)</div></div>`;
+}
+
+/* ---------------- 촬영 거리 계산 ---------------- */
+function calc() {
+  const sw = parseFloat($('#cSensor').value), px = parseFloat($('#cPx').value), f = parseFloat($('#cF').value), sc = parseFloat($('#cScale').value), ov = parseFloat($('#cOv').value);
+  if (![sw,px,f,sc,ov].every(v => isFinite(v) && v > 0) || ov >= 100) { $('#calcOut').innerHTML = '<div class="row"><span class="c">입력을 확인하세요</span></div>'; return; }
+  const tol = 0.2 * sc;                 // mm on ground
+  const gsd = tol / 4;                  // mm/px
+  const dmax = gsd * f * px / sw;       // mm
+  const foot = dmax * sw / f;           // mm, footprint width at dmax
+  const step = foot * (1 - ov / 100);
+  const fmt = (v, d) => v.toLocaleString('ko-KR', {minimumFractionDigits:d, maximumFractionDigits:d});
+  $('#calcOut').innerHTML =
+    `<div class="row"><span class="c">땅 위 허용 오차</span><span class="f">${fmt(tol,1)}<small>mm</small></span></div>` +
+    `<div class="row"><span class="c">권장 GSD (이하)</span><span class="f">${fmt(gsd,2)}<small>mm/px</small></span></div>` +
+    `<div class="row"><span class="c">최대 촬영 거리</span><span class="f">${fmt(dmax/1000,2)}<small>m</small></span></div>` +
+    `<div class="row"><span class="c">그 거리에서 사진 한 장 폭</span><span class="f">${fmt(foot/1000,2)}<small>m</small></span></div>` +
+    `<div class="row"><span class="c">겹침을 지키는 사진 간격</span><span class="f">${fmt(step/1000,2)}<small>m</small></span></div>`;
+}
+
+
+/* ======================================================================
+   화면 보드 1 ~ 5 생성 (DOM 빌더)
+   ====================================================================== */
+
+function renderTrench3DSvg() {
+  const myRng = rng(101);
+  let pts = '';
+  for (let i = 0; i < 420; i++) {
+    const rx = 240 + myRng() * 560;
+    const ry = 150 + myRng() * 250;
+    const t = (ry - 150) / 250;
+    const r = Math.round(180 + t * 40);
+    const g = Math.round(140 + t * 50);
+    const b = Math.round(90 + t * 30);
+    pts += `<circle cx="${rx.toFixed(1)}" cy="${ry.toFixed(1)}" r="1.5" fill="rgb(${r},${g},${b})" opacity="0.85"/>`;
+  }
+  
+  let cams = '';
+  const camCoords = [
+    [260, 40], [380, 30], [520, 25], [660, 30], [780, 40],
+    [240, 100], [800, 100],
+    [220, 480], [360, 495], [520, 500], [680, 495], [820, 480]
+  ];
+  camCoords.forEach(([cx, cy], idx) => {
+    cams += `<g opacity="0.9">
+      <polygon points="${cx},${cy-10} ${cx-12},${cy+12} ${cx+12},${cy+12}" fill="#1F6FB2" fill-opacity="0.25" stroke="#1F6FB2" stroke-width="1.2"/>
+      <circle cx="${cx}" cy="${cy-10}" r="2.5" fill="#141413"/>
+      <line x1="${cx}" y1="${cy-10}" x2="${cx}" y2="${cy+70}" stroke="#1F6FB2" stroke-width="0.75" stroke-dasharray="2 3" opacity="0.5"/>
+    </g>`;
+  });
+
+  return `<svg class="art" viewBox="0 0 1320 810" preserveAspectRatio="none" style="position:absolute; inset:0; width:100%; height:100%;">
+    <defs>
+      <pattern id="grid3d" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--line)" stroke-width="0.5" stroke-opacity="0.4"/>
+      </pattern>
+      <linearGradient id="trenchSoil" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#846342"/>
+        <stop offset="50%" stop-color="#674A2C"/>
+        <stop offset="100%" stop-color="#4C341C"/>
+      </linearGradient>
+      <linearGradient id="trenchFloor" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#5A3F24"/>
+        <stop offset="100%" stop-color="#3D2916"/>
+      </linearGradient>
+    </defs>
+    <rect width="100%" height="100%" fill="var(--mapGround)"/>
+    <rect width="100%" height="100%" fill="url(#grid3d)"/>
+    
+    <g transform="translate(140, 60)">
+      <!-- Outer natural ground surface -->
+      <polygon points="120,40 920,40 1020,520 20,520" fill="#9C8363" stroke="#141413" stroke-width="1.5" opacity="0.4"/>
+      <!-- Trench cut slope -->
+      <polygon points="180,90 860,90 940,460 100,460" fill="url(#trenchSoil)" stroke="#141413" stroke-width="2"/>
+      <!-- Pit house floor -->
+      <polygon points="230,140 810,140 880,410 160,410" fill="url(#trenchFloor)" stroke="#141413" stroke-width="2"/>
+      <!-- Perimeter drainage ditch -->
+      <path d="M 220 130 L 820 130 L 890 420 L 150 420 Z" fill="none" stroke="#2B1D0E" stroke-width="8" stroke-opacity="0.7"/>
+      
+      <!-- 4 Main Post Holes -->
+      <ellipse cx="320" cy="210" rx="24" ry="16" fill="#201509" stroke="#E5E4DE" stroke-width="1"/>
+      <text x="320" y="215" font-size="11" fill="#FFFFFF" text-anchor="middle" font-family="var(--sans)">P1 (주초석)</text>
+      <ellipse cx="720" cy="210" rx="24" ry="16" fill="#201509" stroke="#E5E4DE" stroke-width="1"/>
+      <text x="720" y="215" font-size="11" fill="#FFFFFF" text-anchor="middle" font-family="var(--sans)">P2 (주초석)</text>
+      <ellipse cx="300" cy="340" rx="24" ry="16" fill="#201509" stroke="#E5E4DE" stroke-width="1"/>
+      <text x="300" y="345" font-size="11" fill="#FFFFFF" text-anchor="middle" font-family="var(--sans)">P3 (주초석)</text>
+      <ellipse cx="740" cy="340" rx="24" ry="16" fill="#201509" stroke="#E5E4DE" stroke-width="1"/>
+      <text x="740" y="345" font-size="11" fill="#FFFFFF" text-anchor="middle" font-family="var(--sans)">P4 (주초석)</text>
+      
+      <!-- Central Hearth -->
+      <ellipse cx="520" cy="275" rx="42" ry="26" fill="#8C3A27" stroke="#141413" stroke-width="1.5"/>
+      <ellipse cx="520" cy="275" rx="30" ry="18" fill="#3D1A10"/>
+      <text x="520" y="280" font-size="11" fill="#FFFFFF" text-anchor="middle" font-family="var(--sans)">노지(화덕)</text>
+      
+      <!-- Entrance step -->
+      <polygon points="500,410 540,410 560,460 480,460" fill="#755231" stroke="#141413" stroke-width="1"/>
+      
+      <!-- Point Cloud Dots -->
+      ${pts}
+      
+      <!-- Vertical Stratigraphy Cut Line A-A' -->
+      <line x1="80" y1="280" x2="960" y2="280" stroke="#E63946" stroke-width="2.5" stroke-dasharray="8 4"/>
+      <circle cx="80" cy="280" r="6" fill="#E63946" stroke="#FFFFFF" stroke-width="1.5"/>
+      <circle cx="960" cy="280" r="6" fill="#E63946" stroke="#FFFFFF" stroke-width="1.5"/>
+      <rect x="50" y="266" width="24" height="26" rx="4" fill="#E63946"/>
+      <text x="62" y="284" font-size="14" font-weight="bold" fill="#FFFFFF" text-anchor="middle">A</text>
+      <rect x="970" y="266" width="26" height="26" rx="4" fill="#E63946"/>
+      <text x="983" y="284" font-size="14" font-weight="bold" fill="#FFFFFF" text-anchor="middle">A′</text>
+      
+      <!-- GCP-01 -->
+      <g transform="translate(180, 100)">
+        <circle cx="0" cy="0" r="10" fill="#FFD166" stroke="#141413" stroke-width="1.5"/>
+        <line x1="-12" y1="0" x2="12" y2="0" stroke="#141413" stroke-width="1.5"/>
+        <line x1="0" y1="-12" x2="0" y2="12" stroke="#141413" stroke-width="1.5"/>
+        <circle cx="0" cy="0" r="4" fill="#141413"/>
+        <rect x="14" y="-12" width="130" height="22" rx="4" fill="var(--surface)" stroke="var(--edge)" stroke-width="1"/>
+        <text x="20" y="4" font-size="11" font-weight="bold" fill="var(--ink)">GCP-01 <tspan fill="var(--muted)" font-weight="normal">(1.8mm)</tspan></text>
+      </g>
+      <!-- GCP-02 -->
+      <g transform="translate(850, 95)">
+        <circle cx="0" cy="0" r="10" fill="#FFD166" stroke="#141413" stroke-width="1.5"/>
+        <line x1="-12" y1="0" x2="12" y2="0" stroke="#141413" stroke-width="1.5"/>
+        <line x1="0" y1="-12" x2="0" y2="12" stroke="#141413" stroke-width="1.5"/>
+        <circle cx="0" cy="0" r="4" fill="#141413"/>
+        <rect x="-144" y="-12" width="130" height="22" rx="4" fill="var(--surface)" stroke="var(--edge)" stroke-width="1"/>
+        <text x="-138" y="4" font-size="11" font-weight="bold" fill="var(--ink)">GCP-02 <tspan fill="var(--muted)" font-weight="normal">(2.1mm)</tspan></text>
+      </g>
+      <!-- GCP-03 -->
+      <g transform="translate(930, 450)">
+        <circle cx="0" cy="0" r="10" fill="#FFD166" stroke="#141413" stroke-width="1.5"/>
+        <line x1="-12" y1="0" x2="12" y2="0" stroke="#141413" stroke-width="1.5"/>
+        <line x1="0" y1="-12" x2="0" y2="12" stroke="#141413" stroke-width="1.5"/>
+        <circle cx="0" cy="0" r="4" fill="#141413"/>
+        <rect x="-144" y="-12" width="130" height="22" rx="4" fill="var(--surface)" stroke="var(--edge)" stroke-width="1"/>
+        <text x="-138" y="4" font-size="11" font-weight="bold" fill="var(--ink)">GCP-03 <tspan fill="var(--muted)" font-weight="normal">(1.5mm)</tspan></text>
+      </g>
+      <!-- CP-01 (Check Point) -->
+      <g transform="translate(110, 450)">
+        <circle cx="0" cy="0" r="10" fill="#06D6A0" stroke="#141413" stroke-width="1.5"/>
+        <line x1="-12" y1="0" x2="12" y2="0" stroke="#141413" stroke-width="1.5"/>
+        <line x1="0" y1="-12" x2="0" y2="12" stroke="#141413" stroke-width="1.5"/>
+        <circle cx="0" cy="0" r="4" fill="#141413"/>
+        <rect x="14" y="-12" width="154" height="22" rx="4" fill="var(--surface)" stroke="var(--edge)" stroke-width="1"/>
+        <text x="20" y="4" font-size="11" font-weight="bold" fill="#0E8A63">CP-01(검사점) <tspan fill="var(--muted)" font-weight="normal">2.8mm</tspan></text>
+      </g>
+      
+      <!-- Scalebar -->
+      <g transform="translate(680, 430)">
+        <rect x="0" y="0" width="100" height="8" fill="#141413"/>
+        <rect x="0" y="0" width="50" height="8" fill="#FFFFFF" stroke="#141413" stroke-width="0.75"/>
+        <line x1="0" y1="-4" x2="0" y2="12" stroke="#141413" stroke-width="1.5"/>
+        <line x1="100" y1="-4" x2="100" y2="12" stroke="#141413" stroke-width="1.5"/>
+        <text x="50" y="-8" font-size="11" font-family="var(--mono)" font-weight="bold" fill="var(--ink)" text-anchor="middle">1.000 m (±0.2mm)</text>
+      </g>
+      
+      <!-- Drone Camera Pyramids -->
+      ${cams}
+    </g>
+  </svg>`;
+}
+
+function renderSectionSplitSvg() {
+  return `<div style="display:flex; flex-direction:column; height:100%; width:100%; background:var(--desk)">
+    <!-- Upper: Orthomosaic & Contours with Section Cut Line -->
+    <div style="flex:1; border-bottom:2px solid var(--line); position:relative; overflow:hidden; background:var(--mapGround)">
+      <div style="position:absolute; top:12px; left:16px; z-index:2; background:var(--surface); padding:4px 10px; border-radius:6px; font-size:11px; border:1px solid var(--edge)">
+        <b>평면 정사영상 및 10cm 등고선</b> · 축척 1:20 (GSD 1.0mm/px)
+      </div>
+      <svg viewBox="0 0 1600 380" preserveAspectRatio="none" style="width:100%; height:100%">
+        <!-- Orthomosaic simulation terrain -->
+        <rect width="100%" height="100%" fill="#7A6043"/>
+        <polygon points="200,60 1400,50 1480,340 120,350" fill="#5E4731" stroke="#141413" stroke-width="1"/>
+        <ellipse cx="800" cy="200" rx="480" ry="110" fill="#4B3724"/>
+        
+        <!-- 10cm Contours -->
+        <g fill="none" stroke="#F1C40F" stroke-width="1.2" opacity="0.85">
+          <ellipse cx="800" cy="200" rx="540" ry="125"/>
+          <ellipse cx="800" cy="200" rx="510" ry="118"/>
+          <ellipse cx="800" cy="200" rx="480" ry="110" stroke-width="2"/> <!-- 계곡선 -->
+          <ellipse cx="800" cy="200" rx="430" ry="98"/>
+          <ellipse cx="800" cy="200" rx="370" ry="82"/>
+          <ellipse cx="800" cy="200" rx="300" ry="64"/>
+          <ellipse cx="800" cy="200" rx="200" ry="42" stroke-width="2"/>
+        </g>
+        <text x="800" y="94" font-size="10" fill="#F1C40F" font-family="var(--mono)" text-anchor="middle">+34.50 m</text>
+        <text x="800" y="122" font-size="10" fill="#F1C40F" font-family="var(--mono)" text-anchor="middle">+34.00 m</text>
+        <text x="800" y="162" font-size="10" fill="#F1C40F" font-family="var(--mono)" text-anchor="middle">+33.50 m</text>
+        
+        <!-- Red Cutting Line A-A' with view direction arrows pointing North -->
+        <line x1="220" y1="200" x2="1380" y2="200" stroke="#E63946" stroke-width="3" stroke-dasharray="8 4"/>
+        <g fill="#E63946">
+          <circle cx="220" cy="200" r="7"/>
+          <circle cx="1380" cy="200" r="7"/>
+          <!-- View direction arrows (North) -->
+          <polygon points="350,200 360,180 340,180"/>
+          <polygon points="800,200 810,180 790,180"/>
+          <polygon points="1250,200 1260,180 1240,180"/>
+          <text x="350" y="174" font-size="10" fill="#E63946" text-anchor="middle" font-weight="bold">시선 방향 (북)</text>
+          <text x="800" y="174" font-size="10" fill="#E63946" text-anchor="middle" font-weight="bold">시선 방향 (북)</text>
+          <text x="1250" y="174" font-size="10" fill="#E63946" text-anchor="middle" font-weight="bold">시선 방향 (북)</text>
+        </g>
+        <rect x="180" y="184" width="32" height="32" rx="4" fill="#E63946"/>
+        <text x="196" y="206" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">A</text>
+        <rect x="1390" y="184" width="34" height="32" rx="4" fill="#E63946"/>
+        <text x="1407" y="206" font-size="16" font-weight="bold" fill="#FFFFFF" text-anchor="middle">A′</text>
+      </svg>
+    </div>
+    
+    <!-- Lower: High-precision Archaeological Soil Profile (Vertical Stratigraphy) -->
+    <div style="flex:1; position:relative; overflow:hidden; background:#FAF9F5">
+      <div style="position:absolute; top:12px; left:16px; z-index:2; background:var(--surface); padding:4px 10px; border-radius:6px; font-size:11px; border:1px solid var(--edge)">
+        <b>수직 토층 단면도 (A–A′ Cut)</b> · 실측 축척 1:20 · 표고 기준선 EL. 35.000 m
+      </div>
+      <svg viewBox="0 0 1600 380" preserveAspectRatio="none" style="width:100%; height:100%">
+        <defs>
+          <pattern id="soilHatch1" width="16" height="16" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+            <line x1="0" y1="0" x2="0" y2="16" stroke="#4A3420" stroke-width="1.5" opacity="0.6"/>
+          </pattern>
+          <pattern id="soilHatch2" width="12" height="12" patternUnits="userSpaceOnUse">
+            <circle cx="6" cy="6" r="1.5" fill="#201509" opacity="0.7"/>
+          </pattern>
+        </defs>
+        
+        <!-- Elevation Grid Lines & Ticks -->
+        <g stroke="var(--line)" stroke-width="0.75" stroke-dasharray="3 3">
+          <line x1="120" y1="60" x2="1480" y2="60"/>
+          <line x1="120" y1="120" x2="1480" y2="120"/>
+          <line x1="120" y1="180" x2="1480" y2="180"/>
+          <line x1="120" y1="240" x2="1480" y2="240"/>
+          <line x1="120" y1="300" x2="1480" y2="300"/>
+        </g>
+        
+        <!-- Elevation Axis Labels on Left -->
+        <g font-family="var(--mono)" font-size="11" fill="var(--ink)" text-anchor="end">
+          <text x="110" y="64">EL. 35.00 m</text>
+          <text x="110" y="124">EL. 34.50 m</text>
+          <text x="110" y="184">EL. 34.00 m</text>
+          <text x="110" y="244">EL. 33.50 m</text>
+          <text x="110" y="304">EL. 33.00 m</text>
+        </g>
+        
+        <!-- Horizontal Station Axis (Distance) -->
+        <line x1="120" y1="330" x2="1480" y2="330" stroke="var(--ink)" stroke-width="1.5"/>
+        <g font-family="var(--mono)" font-size="10" fill="var(--muted)" text-anchor="middle">
+          <line x1="120" y1="330" x2="120" y2="336" stroke="var(--ink)" stroke-width="1.5"/>
+          <text x="120" y="348">0.0m (A)</text>
+          <line x1="300" y1="330" x2="300" y2="336" stroke="var(--ink)" stroke-width="1"/>
+          <text x="300" y="348">1.0m</text>
+          <line x1="480" y1="330" x2="480" y2="336" stroke="var(--ink)" stroke-width="1"/>
+          <text x="480" y="348">2.0m</text>
+          <line x1="660" y1="330" x2="660" y2="336" stroke="var(--ink)" stroke-width="1"/>
+          <text x="660" y="348">3.0m</text>
+          <line x1="840" y1="330" x2="840" y2="336" stroke="var(--ink)" stroke-width="1"/>
+          <text x="840" y="348">4.0m</text>
+          <line x1="1020" y1="330" x2="1020" y2="336" stroke="var(--ink)" stroke-width="1"/>
+          <text x="1020" y="348">5.0m</text>
+          <line x1="1200" y1="330" x2="1200" y2="336" stroke="var(--ink)" stroke-width="1"/>
+          <text x="1200" y="348">6.0m</text>
+          <line x1="1380" y1="330" x2="1380" y2="336" stroke="var(--ink)" stroke-width="1"/>
+          <text x="1380" y="348">7.0m</text>
+          <line x1="1456" y1="330" x2="1456" y2="336" stroke="var(--ink)" stroke-width="1.5"/>
+          <text x="1456" y="348">7.42m (A′)</text>
+        </g>
+        
+        <!-- Stratigraphic Soil Layers (토층 층위 및 해칭) -->
+        <!-- Layer 3: 생토 풍화암반층 (Bedrock base) -->
+        <polygon points="120,250 360,250 480,290 1080,290 1200,250 1456,250 1456,330 120,330" fill="#D4B26F" stroke="#141413" stroke-width="1.5"/>
+        
+        <!-- Layer 2: 흑갈색 점토 (주거지 붕괴 매몰토 층위) -->
+        <polygon points="360,170 1200,170 1200,250 1080,290 480,290 360,250" fill="#5A3E26" stroke="#141413" stroke-width="1.5"/>
+        <polygon points="360,170 1200,170 1200,250 1080,290 480,290 360,250" fill="url(#soilHatch2)"/>
+        
+        <!-- Hearth Ash Lens (노지 화덕 재 렌즈) -->
+        <ellipse cx="780" cy="275" rx="70" ry="14" fill="#C0392B" stroke="#141413" stroke-width="1"/>
+        <text x="780" y="278" font-size="9" fill="#FFF" font-family="var(--sans)" text-anchor="middle">적열 소토 / 목탄</text>
+        
+        <!-- Layer 1: 표토 / 경작토 (암갈색 사질점토) -->
+        <polygon points="120,80 1456,80 1456,250 1200,250 1200,170 360,170 360,250 120,250" fill="#8C6E4E" stroke="#141413" stroke-width="1.5"/>
+        <polygon points="120,80 1456,80 1456,250 1200,250 1200,170 360,170 360,250 120,250" fill="url(#soilHatch1)"/>
+        
+        <!-- Archaeological Annotations with Leader Lines -->
+        <g stroke="#141413" stroke-width="1" fill="none">
+          <polyline points="260,120 280,100 380,100"/>
+          <polyline points="680,220 700,200 850,200"/>
+          <polyline points="320,290 340,310 460,310"/>
+        </g>
+        <g font-size="11" fill="var(--ink)" font-family="var(--sans)">
+          <text x="385" y="104" font-weight="bold">I층: 표토 / 현대 경작토 <tspan font-weight="normal" fill="var(--muted)">(암갈색 사질점토, 두께 25~40cm)</tspan></text>
+          <text x="855" y="204" font-weight="bold">II층: 흑갈색 점토층 <tspan font-weight="normal" fill="var(--muted)">(주거지 내부 매몰토, 삼국시대 타날문토기편 출토)</tspan></text>
+          <text x="465" y="314" font-weight="bold">III층: 기반 생토층 <tspan font-weight="normal" fill="var(--muted)">(황갈색 풍화암반 풍화토)</tspan></text>
+        </g>
+        
+        <!-- CAD Title Block (표제란) in Bottom-Right Corner -->
+        <g transform="translate(1180, 220)">
+          <rect x="0" y="0" width="280" height="96" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.5"/>
+          <line x1="0" y1="24" x2="280" y2="24" stroke="var(--line)" stroke-width="1"/>
+          <line x1="0" y1="48" x2="280" y2="48" stroke="var(--line)" stroke-width="1"/>
+          <line x1="0" y1="72" x2="280" y2="72" stroke="var(--line)" stroke-width="1"/>
+          <line x1="80" y1="0" x2="80" y2="96" stroke="var(--line)" stroke-width="1"/>
+          <line x1="180" y1="48" x2="180" y2="96" stroke="var(--line)" stroke-width="1"/>
+          <g font-size="11" fill="var(--muted)" font-family="var(--sans)">
+            <text x="10" y="16">유구명</text>
+            <text x="10" y="40">도면명</text>
+            <text x="10" y="64">축척</text>
+            <text x="10" y="88">조사기관</text>
+          </g>
+          <g font-size="11" fill="var(--ink)" font-family="var(--sans)">
+            <text x="90" y="16" font-weight="bold">광령리1 유적</text>
+            <text x="90" y="40" font-weight="bold">1호 주거지 토층단면도 (A–A′)</text>
+            <text x="90" y="64" font-family="var(--mono)" font-weight="bold">1 : 20</text>
+            <text x="190" y="64" class="muted">실측일: 2026.10</text>
+            <text x="90" y="88">한국고고학조사원 (조사2팀)</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+  </div>`;
+}
+
+function drawBoards() {
+  const ctl = (num, title) => `
+    <div class="boardbar" id="bbar-${num}">
+      <span class="t"><b>보드 ${num}</b> · ${title}</span>
+      <span class="sp"></span>
+      <span class="muted" style="font-size:12px">1920 × 1040</span>
+      <button class="btn bfit on" onclick="toggleBoardSize(${num}, false)">폭에 맞추기</button>
+      <button class="btn bactual" onclick="toggleBoardSize(${num}, true)">실제 크기 1:1</button>
+    </div>
+  `;
+
+  let h = `
+    <!-- 상단 5개 보드 바로가기 내비게이션 -->
+    <div style="display:flex; gap:8px; margin:8px 0 24px; flex-wrap:wrap">
+      <a class="btn on" href="#bbar-1" style="text-decoration:none">보드 1 · 3D 모델 작업 (1호 주거지)</a>
+      <a class="btn" href="#bbar-2" style="text-decoration:none">보드 2 · 홈 화면 (조사 관리 · 작업 순서)</a>
+      <a class="btn" href="#bbar-3" style="text-decoration:none">보드 3 · 토층 단면도 (A-A') 및 등고선</a>
+      <a class="btn" href="#bbar-4" style="text-decoration:none">보드 4 · 대화창 모음 (새 조사 · 타깃 · 카메라)</a>
+      <a class="btn" href="#bbar-5" style="text-decoration:none">보드 5 · 국가유산청 검수 및 제출 꾸러미</a>
+    </div>
+  `;
+
+  /* ----------------------------------------------------
+     보드 1: 3D 모델 작업 화면 (광령리1 · 1호 주거지)
+     ---------------------------------------------------- */
+  h += ctl(1, '3D 모델 작업 화면 (광령리1 · 1호 주거지)');
+  h += `<div class="bwrap" id="bwrap-1"><div class="board" id="board-1">
+    <div class="cap">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <span>AGI — 광령리1 · 1호 주거지 [작업 중*]</span>
+    </div>
+    ${ribbonHTML({unsaved:true, tool:'gcp'})}
+    <div class="vtabs">
+      <div class="vtab">${ic('house')}홈</div>
+      <div class="vtab cur">${ic('box')}모델</div>
+      <div class="vtab">${ic('ka-ortho')}정사 (광령리1-1호)</div>
+      <div class="vtab">${ic('ka-section')}단면 (A-A')</div>
+      <div class="vtab">${ic('file-text')}도면</div>
+      <div class="corner"><span class="lbl">검사점 오차:</span><span class="mono" style="color:var(--done)">2.8 mm</span></div>
+    </div>
+    <div class="subbar">
+      <span class="lbl">기준점 ›</span>
+      <button class="tbtn on">${ic('locate-fixed')}점 찍기</button>
+      <button class="tbtn shown">${ic('zoom-in')}확대경 16×</button>
+      <button class="tbtn">${ic('target')}자동 표지 찾기</button>
+      <div class="vrule"></div>
+      <span style="font-size:12px;display:flex;gap:12px;align-items:center">
+        <span><b>GCP-01</b> <span class="mono muted">1.8mm</span></span>
+        <span><b>GCP-02</b> <span class="mono muted">2.1mm</span></span>
+        <span><b>GCP-03</b> <span class="mono muted">1.5mm</span></span>
+        <span><b style="color:var(--nextText)">CP-01(검사점)</b> <span class="mono" style="color:var(--nextText)">2.8mm</span></span>
+      </span>
+      <div class="vrule"></div>
+      <button class="tbtn">${ic('download')}좌표 불러오기 (CSV)</button>
+      <button class="tbtn" style="margin-left:auto">${ic('x')}닫기 (Esc)</button>
+    </div>
+    <div class="page">
+      <div class="pnl" style="width:280px; flex:none; border-right:1px solid var(--line)">
+        <div class="phead">
+          <span class="t" style="font-weight:700">작업 목록 (조사 트리)</span>
+          <button class="btn" style="height:24px;padding:0 6px">${ic('plus')}</button>
+        </div>
+        <div class="band">조사 묶음</div>
+        <div class="krow sel">
+          <span class="nm">📁 광령리1 · 1호 주거지</span>
+          <span class="cnt mono">48장</span>
+        </div>
+        <div class="krow sub">
+          <div class="cb on"></div>
+          <span class="nm">📷 사진 (정렬됨 48/48)</span>
+          <span class="cnt mono">100%</span>
+        </div>
+        <div class="krow sub">
+          <div class="cb on"></div>
+          <span class="nm">🎯 기준점 (GCP 3 · 검사 1)</span>
+          <span class="cnt mono">4개</span>
+        </div>
+        <div class="krow sub">
+          <div class="cb on"></div>
+          <span class="nm">📏 축척자 (1.000m)</span>
+          <span class="cnt mono">±0.2mm</span>
+        </div>
+        <div class="band">3D 복원 성과</div>
+        <div class="krow">
+          <div class="cb on"></div>
+          <span class="nm">☁️ 성긴 점 (Sparse Cloud)</span>
+          <span class="cnt mono">82.4K</span>
+        </div>
+        <div class="krow sel">
+          <div class="cb on"></div>
+          <span class="nm" style="font-weight:700">☁️ 고밀도 점군 (Dense Cloud)</span>
+          <span class="cnt mono">8.41M</span>
+        </div>
+        <div class="krow">
+          <div class="cb on"></div>
+          <span class="nm">🔺 3D 다각망 면 (Mesh)</span>
+          <span class="cnt mono">1.42M</span>
+        </div>
+        <div class="band">도면화 성과</div>
+        <div class="krow">
+          <div class="cb on"></div>
+          <span class="nm">🗺️ 평면 정사영상 (1:20)</span>
+          <span class="cnt mono">GSD 1.0mm</span>
+        </div>
+        <div class="krow">
+          <div class="cb on"></div>
+          <span class="nm">📐 토층 단면 (A-A' 수직)</span>
+          <span class="cnt mono">DXF</span>
+        </div>
+        <div class="krow">
+          <div class="cb on"></div>
+          <span class="nm">〰️ 10cm 등고선</span>
+          <span class="cnt mono">SHP</span>
+        </div>
+      </div>
+      
+      <div class="split"></div>
+      
+      <div class="center" style="position:relative">
+        ${renderTrench3DSvg()}
+        
+        <div class="ov row" style="top:16px; left:16px">
+          <button class="ib on" title="3D 조감 뷰">${ic('box')}</button>
+          <button class="ib" title="평면 직교 뷰 (Top)">${ic('map')}</button>
+          <button class="ib" title="정면 뷰 (Front)">${ic('ka-section')}</button>
+        </div>
+        
+        <div class="ov row" style="top:16px; right:16px">
+          <button class="ib on" title="카메라 위치 켜기">${ic('camera')}</button>
+          <button class="ib on" title="고밀도 점군 (8.4M)">${ic('ka-cloud')}</button>
+          <button class="ib on" title="기준점 및 표지">${ic('target')}</button>
+          <button class="ib on" title="단면선 A-A'">${ic('ka-section')}</button>
+        </div>
+        
+        <div class="ov" style="bottom:16px; left:16px; display:flex; align-items:center; gap:12px">
+          <svg width="48" height="48" viewBox="-24 -24 48 48">
+            <circle cx="0" cy="0" r="22" fill="none" stroke="var(--line)" stroke-width="1"/>
+            <path d="M 0 -22 L 4 -12 L -4 -12 Z" fill="#E63946"/>
+            <text x="0" y="-8" font-size="9" font-weight="bold" fill="#E63946" text-anchor="middle">N</text>
+            <line x1="0" y1="0" x2="16" y2="8" stroke="#0E8A63" stroke-width="2"/>
+            <text x="18" y="12" font-size="8" fill="#0E8A63">X</text>
+            <line x1="0" y1="0" x2="-14" y2="12" stroke="#1F6FB2" stroke-width="2"/>
+            <text x="-18" y="16" font-size="8" fill="#1F6FB2">Y</text>
+            <line x1="0" y1="0" x2="0" y2="-16" stroke="#E63946" stroke-width="2"/>
+            <text x="4" y="-18" font-size="8" fill="#E63946">Z</text>
+          </svg>
+          <div>
+            <div style="font-weight:bold; font-size:11px">도북 진북 보정: +0°24′12″</div>
+            <div class="mono muted" style="font-size:10px">중부원점 EPSG:5186</div>
+          </div>
+        </div>
+        
+        <div class="ov" style="bottom:16px; right:16px; font-family:var(--mono); font-size:11px">
+          <span style="color:var(--done)">● 60.0 FPS</span> · Apple Silicon Metal 가속 · 시점 높이 4.2m
+        </div>
+      </div>
+      
+      <div class="split"></div>
+      
+      <div class="pnl" style="width:320px; flex:none; border-left:1px solid var(--line); display:flex; flex-direction:column">
+        <div class="phead">
+          <span class="t" style="font-weight:700">속성 및 검측 정보</span>
+          <span class="mono muted" style="font-size:11px">DSC_0024.JPG</span>
+        </div>
+        
+        <div style="height:140px; margin:8px 0; background:#201E1B; border-radius:6px; position:relative; overflow:hidden; border:1px solid var(--line)">
+          <svg width="100%" height="100%" viewBox="0 0 288 140">
+            <rect width="100%" height="100%" fill="#3A2C1F"/>
+            <circle cx="144" cy="70" rx="60" ry="40" fill="#5C4533"/>
+            <circle cx="180" cy="50" r="16" fill="#141413"/>
+            <circle cx="180" cy="50" r="12" fill="#FFD166"/>
+            <line x1="160" y1="50" x2="200" y2="50" stroke="#141413" stroke-width="1.5"/>
+            <line x1="180" y1="30" x2="180" y2="70" stroke="#141413" stroke-width="1.5"/>
+            <circle cx="210" cy="90" r="38" fill="var(--surface)" stroke="var(--ink)" stroke-width="2"/>
+            <circle cx="210" cy="90" r="36" fill="#FFD166" fill-opacity="0.2"/>
+            <line x1="172" y1="90" x2="248" y2="90" stroke="#E63946" stroke-width="1" stroke-dasharray="2 2"/>
+            <line x1="210" y1="52" x2="210" y2="128" stroke="#E63946" stroke-width="1" stroke-dasharray="2 2"/>
+            <circle cx="210" cy="90" r="2" fill="#E63946"/>
+            <text x="210" y="118" font-size="9" fill="var(--ink)" font-family="var(--mono)" text-anchor="middle">16× 확대경</text>
+          </svg>
+          <div style="position:absolute; top:6px; left:8px; font-size:10px; background:rgba(0,0,0,0.6); color:#FFF; padding:2px 6px; border-radius:3px">
+            T02 중심 잔차: 0.12 px
+          </div>
+        </div>
+        
+        <div class="band">촬영 정보</div>
+        <div style="display:grid; grid-template-columns:84px 1fr; gap:4px 8px; font-size:12px; margin-bottom:12px">
+          <span class="muted">카메라 모형</span><span>Nikon D850</span>
+          <span class="muted">렌즈 규격</span><span>AF-S 35mm f/1.8G</span>
+          <span class="muted">초점거리</span><span class="mono">35.0 mm</span>
+          <span class="muted">사진 크기</span><span class="mono">8256 × 5504 px</span>
+          <span class="muted">셔터 / 감도</span><span class="mono">1/250s · ISO 100</span>
+          <span class="muted">재투영 오차</span><span class="mono" style="color:var(--done)">0.28 px (최대 0.54)</span>
+          <span class="muted">인식된 타깃</span><span>T01, T02 (일치)</span>
+        </div>
+        
+        <div class="band">자가보정 파라미터 (Brown-Conrady)</div>
+        <div style="display:grid; grid-template-columns:84px 1fr; gap:4px 8px; font-size:11px; font-family:var(--mono)">
+          <span class="muted" style="font-family:var(--sans)">fx, fy</span><span>5412.3 · 5410.8 px</span>
+          <span class="muted" style="font-family:var(--sans)">cx, cy</span><span>4128.0 · 2752.1 px</span>
+          <span class="muted" style="font-family:var(--sans)">k1, k2, k3</span><span>-0.0821 · 0.1042 · -0.0125</span>
+          <span class="muted" style="font-family:var(--sans)">p1, p2</span><span>+0.00012 · -0.00008</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="status">
+      <span class="sent">광령리1 · 1호 주거지 — 사진 48장 정렬 완료 · 고밀도 점군 8,412,050점 생성됨</span>
+      <div class="cell"><span class="dot"></span>저장 안 됨 1건</div>
+      <div class="cell"><span class="lbl">좌표</span><span class="mono">X 194,821.120 · Y 452,119.340 · Z 34.215</span></div>
+      <div class="cell"><span class="lbl">검사점 오차</span><span class="mono" style="color:var(--done)">2.8 mm</span></div>
+      <div class="cell">작업 5186 (중부원점) ▾ <span class="mono muted">→ 제출 5179</span></div>
+      <div class="cell"><span style="color:var(--done)">●</span> GPU 사용 (Apple M3 Metal)</div>
+    </div>
+  </div></div>`;
+
+  /* ----------------------------------------------------
+     보드 2: 홈 화면 (조사 시작 · 관리 · 순서)
+     ---------------------------------------------------- */
+  h += ctl(2, '홈 화면 (조사 시작 · 관리 · 순서)');
+  h += `<div class="bwrap" id="bwrap-2"><div class="board" id="board-2">
+    <div class="cap">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <span>AGI — 고고학 3D 사진측량 및 도면화 시스템</span>
+    </div>
+    ${ribbonHTML({dim:['align','build','draw','out']})}
+    <div class="vtabs">
+      <div class="vtab cur">${ic('house')}홈</div>
+      <div class="vtab">${ic('box')}모델</div>
+      <div class="corner"><span class="mono muted" style="font-size:11px">v0.2.0-alpha (Pure Rust SFM Engine)</span></div>
+    </div>
+    <div class="page" style="background:var(--desk); padding:32px; overflow:auto">
+      <div style="max-width:1400px; margin:0 auto; width:100%; display:flex; flex-direction:column; gap:24px">
+        
+        <!-- 표제란 헤더 카드 -->
+        <div class="paper" style="display:flex; align-items:center; justify-content:space-between; padding:24px 32px">
+          <div>
+            <div style="font-size:24px; font-weight:700; line-height:32px">AGI 고고학 사진측량 및 도면화 시스템</div>
+            <div class="muted" style="margin-top:4px">국가유산 발굴 현장 전용 1:1 실측 · 3D 복원 · 단면 투영 · 국가유산청 규격 제출 파이프라인</div>
+          </div>
+          <div style="display:flex; gap:12px">
+            <button class="btn on" style="height:40px; padding:0 20px; font-weight:700">${ic('file-plus')}새 조사 시작 (Ctrl+N)</button>
+            <button class="btn" style="height:40px; padding:0 20px">${ic('folder')}조사 열기 (Ctrl+O)</button>
+            <button class="btn" style="height:40px; padding:0 16px">${ic('box')}표본 조사 열기 (광령리1)</button>
+          </div>
+        </div>
+        
+        <!-- 2열 카드 섹션 -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px">
+          <!-- 최근 조사 목록 -->
+          <div class="paper">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
+              <span style="font-size:16px; font-weight:700">최근 조사 목록</span>
+              <span class="mono muted" style="font-size:12px">총 4건</span>
+            </div>
+            <table class="t3">
+              <tr><th>조사명 및 유구</th><th>사진</th><th>작업 좌표계</th><th>진행 상태</th><th>최종 수정</th></tr>
+              <tr style="cursor:pointer"><td><b>광령리1 · 1호 주거지</b></td><td class="mono">48장</td><td class="mono">EPSG:5186</td><td><span style="color:var(--done)">● 모델 및 단면 완료</span></td><td class="muted">방금 전</td></tr>
+              <tr style="cursor:pointer"><td><b>하가리 고분군 A구역 3호분</b></td><td class="mono">124장</td><td class="mono">EPSG:5187</td><td><span style="color:var(--done)">● 정사영상 완료</span></td><td class="muted">2일 전</td></tr>
+              <tr style="cursor:pointer"><td><b>풍납토성 동벽 트렌치 2차</b></td><td class="mono">210장</td><td class="mono">EPSG:5186</td><td><span style="color:var(--ink)">● 제출 꾸러미 생성됨</span></td><td class="muted">5일 전</td></tr>
+              <tr style="cursor:pointer"><td><b>춘천 중도 철기시대 유구</b></td><td class="mono">85장</td><td class="mono">EPSG:5186</td><td><span>● 기준점 정렬 완료</span></td><td class="muted">2026-09-28</td></tr>
+            </table>
+          </div>
+          
+          <!-- 고고학 사진측량 워크플로우 6단계 -->
+          <div class="paper">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px">
+              <span style="font-size:16px; font-weight:700">고고학 발굴 사진측량 표준 작업 순서</span>
+              <span class="mono muted" style="font-size:12px">6-Step Pipeline</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:12px">
+              <div style="display:flex; align-items:center; gap:12px; padding:8px 12px; background:var(--wash); border-radius:6px">
+                <span style="width:24px; height:24px; border-radius:12px; background:var(--ink); color:#FFF; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700">1</span>
+                <span style="width:160px; font-weight:700">현장 촬영 및 사진 입력</span>
+                <span class="muted" style="font-size:12px; flex:1">도면 축척(1:20) 기반 권장 GSD(1mm 이하) 및 겹침율(80%) 검증</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; padding:8px 12px; background:var(--wash); border-radius:6px">
+                <span style="width:24px; height:24px; border-radius:12px; background:var(--ink); color:#FFF; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700">2</span>
+                <span style="width:160px; font-weight:700">특징점 및 사진 정렬</span>
+                <span class="muted" style="font-size:12px; flex:1">SIFT/FAST 순수 Rust 특징점 추출 및 에피폴라 기하 기반 카메라 위치 추정</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; padding:8px 12px; background:var(--wash); border-radius:6px">
+                <span style="width:24px; height:24px; border-radius:12px; background:var(--ink); color:#FFF; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700">3</span>
+                <span style="width:160px; font-weight:700">기준점 및 표지 검측</span>
+                <span class="muted" style="font-size:12px; flex:1">원형 14비트 타깃 자동 인식 및 번들 조정(BA)으로 mm 단위 실측 절대좌표 부여</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; padding:8px 12px; background:var(--wash); border-radius:6px">
+                <span style="width:24px; height:24px; border-radius:12px; background:var(--ink); color:#FFF; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700">4</span>
+                <span style="width:160px; font-weight:700">고밀도 점군 및 면 복원</span>
+                <span class="muted" style="font-size:12px; flex:1">GPU 가속 깊이맵 생성으로 수백만 점 복원 및 신뢰도 기반 점별 정밀도 산출</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; padding:8px 12px; background:var(--wash); border-radius:6px">
+                <span style="width:24px; height:24px; border-radius:12px; background:var(--ink); color:#FFF; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700">5</span>
+                <span style="width:160px; font-weight:700">평면·토층 단면 도면화</span>
+                <span class="muted" style="font-size:12px; flex:1">1-클릭 트렌치 평면 정사영상, A-A' 수직 토층 단면도 및 10cm 등고선 추출</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; padding:8px 12px; background:var(--wash); border-radius:6px">
+                <span style="width:24px; height:24px; border-radius:12px; background:var(--ink); color:#FFF; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700">6</span>
+                <span style="width:160px; font-weight:700">국가유산청 규격 제출</span>
+                <span class="muted" style="font-size:12px; flex:1">7대 사전 검수 게이트 통과, EPSG:5179 변환, 처리기록지 및 MANIFEST.sha256 패키징</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 하단 시스템 상태 카드 -->
+        <div class="paper" style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px">
+          <div style="display:flex; align-items:center; gap:16px">
+            <span style="color:var(--done); font-weight:700">● Pure Rust Engine 준비 완료</span>
+            <span class="muted">|</span>
+            <span>연산 가속: <b>Apple Silicon Metal GPU (WGPU 23)</b></span>
+            <span class="muted">|</span>
+            <span>병렬 처리: <b>16코어 Rayon Work-Stealing</b></span>
+            <span class="muted">|</span>
+            <span>좌표계: <b>GRS80 EPSG:5186 / 5187 / 5179 내장</b></span>
+          </div>
+          <span class="mono muted" style="font-size:12px">메모리 가용: 28.4 GB / 36.0 GB</span>
+        </div>
+        
+      </div>
+    </div>
+    <div class="status">
+      <span class="sent">새로운 조사를 시작하거나 기존 조사 프로젝트를 여십시오.</span>
+      <div class="cell">시스템 상태: 정상</div>
+      <div class="cell"><span style="color:var(--done)">●</span> GPU 가속 켜짐</div>
+    </div>
+  </div></div>`;
+
+  /* ----------------------------------------------------
+     보드 3: 토층 단면도 (A-A') 및 등고선 실측 뷰
+     ---------------------------------------------------- */
+  h += ctl(3, '토층 단면도 (A-A\') 및 등고선 실측 뷰 (도면화 핵심)');
+  h += `<div class="bwrap" id="bwrap-3"><div class="board" id="board-3">
+    <div class="cap">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <span>AGI — 광령리1 · 1호 주거지 [토층 단면 실측]</span>
+    </div>
+    ${ribbonHTML({tool:'section'})}
+    <div class="vtabs">
+      <div class="vtab">${ic('house')}홈</div>
+      <div class="vtab">${ic('box')}모델</div>
+      <div class="vtab">${ic('ka-ortho')}정사 (광령리1-1호)</div>
+      <div class="vtab cur">${ic('ka-section')}단면 (A-A')</div>
+      <div class="vtab">${ic('file-text')}도면</div>
+      <div class="corner"><span class="lbl">축척:</span><span class="mono" style="font-weight:700">1 : 20</span></div>
+    </div>
+    <div class="subbar">
+      <span class="lbl">도구: 단면 ›</span>
+      <span style="font-size:12px">단면선: <b>A — A′ (길이 7.42m)</b></span>
+      <div class="vrule"></div>
+      <span style="font-size:12px">절단폭: <b class="mono">±5 cm</b></span>
+      <div class="vrule"></div>
+      <span style="font-size:12px">기준 표고: <b class="mono">EL. 35.000 m</b></span>
+      <div class="vrule"></div>
+      <button class="tbtn shown">${ic('ka-contour')}10cm 등고선 ON</button>
+      <button class="tbtn">${ic('download')}AutoCAD DXF 저장</button>
+      <button class="tbtn">${ic('printer')}PDF 실측도판 인쇄</button>
+      <button class="tbtn" style="margin-left:auto">${ic('x')}닫기 (Esc)</button>
+    </div>
+    <div class="page">
+      ${renderSectionSplitSvg()}
+    </div>
+    <div class="status">
+      <span class="sent">단면 A–A′ 수직 절단 완료 · 총 길이 7.42m · 표고차 1.84m · CAD 레이어(토층경계선, 주구, 적열토) 분리됨</span>
+      <div class="cell"><span class="lbl">선택 좌표</span><span class="mono">X 194,824.500 · Y 452,122.100 · EL 33.850m</span></div>
+      <div class="cell"><span class="lbl">축척</span><span class="mono">1 : 20 (오차 0.2mm 이하)</span></div>
+      <div class="cell">작업 5186 ▾ <span class="mono muted">→ 제출 5179</span></div>
+    </div>
+  </div></div>`;
+
+  /* ----------------------------------------------------
+     보드 4: 대화창 모음 (팝업 다이얼로그 설계)
+     ---------------------------------------------------- */
+  h += ctl(4, '대화창 모음 (새 조사 · 타깃 검측 · 카메라 자가보정)');
+  h += `<div class="bwrap" id="bwrap-4"><div class="board" id="board-4">
+    <div class="cap">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <span>AGI — 대화창 설계 명세</span>
+    </div>
+    ${ribbonHTML()}
+    <div class="page" style="background:var(--desk); padding:32px; position:relative; overflow:auto">
+      
+      <!-- 대화창 1: 새 조사 만들기 (M 560) -->
+      <div class="dlg" style="width:480px; position:absolute; top:40px; left:40px">
+        <div class="dcap">
+          <div class="lights"><i></i><i></i><i></i></div>
+          <span>새 조사 만들기</span>
+        </div>
+        <div class="dbody">
+          <div class="frow"><span class="l">조사명</span><div class="field"><input value="광령리1 유적" style="border:0;width:100%;font:13px var(--sans);background:transparent;color:var(--ink)"></div></div>
+          <div class="frow"><span class="l">유구 번호</span><div class="field"><input value="1호 주거지" style="border:0;width:100%;font:13px var(--sans);background:transparent;color:var(--ink)"></div></div>
+          <div class="frow"><span class="l">조사 기관</span><div class="field"><input value="한국고고학조사원" style="border:0;width:100%;font:13px var(--sans);background:transparent;color:var(--ink)"></div></div>
+          <div class="frow">
+            <span class="l">작업 좌표계</span>
+            <div>
+              <div class="field" style="font-weight:700">EPSG:5186 (KGD2002 중부원점) ▾</div>
+              <div style="margin-top:6px; font-size:11px; color:var(--muted)">경도 눈금자 (127°00′ 중심) · 도북 진북 보정 자동 적용</div>
+            </div>
+          </div>
+          <div class="frow"><span class="l">저장 위치</span><div class="field mono" style="font-size:11px; color:var(--muted)">/Users/kwon/Documents/Surveys/Gwangryeong_01/</div></div>
+        </div>
+        <div class="dfoot">
+          <span class="sp"></span>
+          <button class="btn">취소</button>
+          <button class="btn on">조사 생성 (Enter)</button>
+        </div>
+      </div>
+      
+      <!-- 대화창 2: 타깃 및 기준점 검측 (S 440) -->
+      <div class="dlg" style="width:440px; position:absolute; top:40px; left:560px">
+        <div class="dcap">
+          <div class="lights"><i></i><i></i><i></i></div>
+          <span>타깃 및 기준점 검측</span>
+        </div>
+        <div class="dbody">
+          <div class="frow"><span class="l">타깃 규격</span><div class="field">원형 14비트 (Agisoft/Strata 호환) ▾</div></div>
+          <div class="frow"><span class="l">검출 허용 오차</span><div class="field num"><input value="0.10" style="border:0;width:100%;text-align:right;font:13px var(--mono);background:transparent;color:var(--ink)"><span class="unit">px</span></div></div>
+          <div class="band" style="margin-top:16px">자동 인식된 타깃 목록 (사진 48매 전원 검출)</div>
+          <table class="t3 dense" style="margin-top:8px">
+            <tr><th>타깃</th><th>검출 매수</th><th class="num">중심 오차</th><th>역할 지정</th></tr>
+            <tr><td><b>T01</b></td><td>48 / 48</td><td class="num mono">0.08 px</td><td>GCP (기준점)</td></tr>
+            <tr><td><b>T02</b></td><td>48 / 48</td><td class="num mono">0.09 px</td><td>GCP (기준점)</td></tr>
+            <tr><td><b>T03</b></td><td>46 / 48</td><td class="num mono">0.11 px</td><td>GCP (기준점)</td></tr>
+            <tr><td><b>T04</b></td><td>48 / 48</td><td class="num mono">0.07 px</td><td><span style="color:var(--nextText); font-weight:700">CP (검사점)</span></td></tr>
+          </table>
+        </div>
+        <div class="dfoot">
+          <span class="sp"></span>
+          <button class="btn">닫기</button>
+          <button class="btn on">기준점 좌표에 자동 연결</button>
+        </div>
+      </div>
+      
+      <!-- 대화창 3: 카메라 자가보정 및 왜곡 파라미터 (M 560) -->
+      <div class="dlg" style="width:520px; position:absolute; top:40px; left:1040px">
+        <div class="dcap">
+          <div class="lights"><i></i><i></i><i></i></div>
+          <span>카메라 자가보정 잔차 (Brown-Conrady)</span>
+        </div>
+        <div class="dbody">
+          <div style="font-size:12px; margin-bottom:12px; color:var(--muted)">렌즈 방사 왜곡 곡선 및 주점(Principal Point) 편차 그래프</div>
+          <svg viewBox="0 0 460 140" style="background:var(--surface); border:1px solid var(--line); border-radius:6px; width:100%; height:140px">
+            <!-- Radial distortion plot -->
+            <line x1="40" y1="70" x2="440" y2="70" stroke="var(--line)" stroke-width="1"/>
+            <line x1="40" y1="10" x2="40" y2="130" stroke="var(--line)" stroke-width="1"/>
+            <path d="M 40 70 Q 140 70 240 50 T 440 20" fill="none" stroke="#1F6FB2" stroke-width="2"/>
+            <text x="240" y="38" font-size="10" fill="#1F6FB2" font-family="var(--mono)">방사 왜곡 곡선 (k1, k2)</text>
+            <text x="44" y="24" font-size="9" fill="var(--muted)" font-family="var(--mono)">+12 px</text>
+            <text x="44" y="124" font-size="9" fill="var(--muted)" font-family="var(--mono)">-12 px</text>
+            <text x="420" y="86" font-size="9" fill="var(--muted)" font-family="var(--mono)">반경 r</text>
+          </svg>
+          <div class="band" style="margin-top:16px">추정된 내부 표정 계수 (자유도: 14,820점)</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11px; font-family:var(--mono); margin-top:8px">
+            <div>초점거리 fx: <b>5412.3 px</b> (±0.4)</div>
+            <div>초점거리 fy: <b>5410.8 px</b> (±0.4)</div>
+            <div>주점 cx: <b>4128.0 px</b></div>
+            <div>주점 cy: <b>2752.1 px</b></div>
+            <div>방사 k1: <b>-0.082104</b></div>
+            <div>방사 k2: <b>+0.104218</b></div>
+            <div>접선 p1: <b>+0.000122</b></div>
+            <div>접선 p2: <b>-0.000084</b></div>
+          </div>
+        </div>
+        <div class="dfoot">
+          <span class="sp"></span>
+          <button class="btn">보정값 초기화</button>
+          <button class="btn on">보정 계수 확정</button>
+        </div>
+      </div>
+      
+    </div>
+    <div class="status">
+      <span class="sent">대화창 명세: 단일 목적 창, 정확한 치수(S 440 / M 560 / L 860), Strata 규격 준수</span>
+      <div class="cell">시스템 상태: 정상</div>
+    </div>
+  </div></div>`;
+
+  /* ----------------------------------------------------
+     보드 5: 국가유산청 검수 및 제출 꾸러미 (820 × 580)
+     ---------------------------------------------------- */
+  h += ctl(5, '국가유산청 검수 및 제출 꾸러미 생성기 (820 × 580)');
+  h += `<div class="bwrap" id="bwrap-5"><div class="board" id="board-5">
+    <div class="cap">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <span>AGI — 국가유산청 성과품 검수 및 제출</span>
+    </div>
+    ${ribbonHTML()}
+    <div class="page" style="background:var(--desk); padding:32px; display:flex; align-items:center; justify-content:center">
+      
+      <!-- 모달 대화창 (820 × 580) -->
+      <div class="dlg" style="width:820px; height:580px; position:static; box-shadow:0 24px 60px rgba(0,0,0,0.18)">
+        <div class="dcap">
+          <div class="lights"><i></i><i></i><i></i></div>
+          <span style="font-weight:700">국가유산청 고고학 발굴조사 성과품 검수 및 제출 꾸러미 생성</span>
+        </div>
+        <div class="dbody" style="display:flex; flex-direction:column; gap:16px; overflow:auto">
+          
+          <!-- 7대 사전 검수 게이트 -->
+          <div>
+            <div style="font-size:14px; font-weight:700; margin-bottom:8px">7대 사전 검수 게이트 (전원 통과)</div>
+            <table class="t3 dense">
+              <tr><th style="width:40px">상태</th><th>검수 항목</th><th>측정치 / 기준</th><th>판정</th></tr>
+              <tr><td><span style="color:var(--done)">✓</span></td><td><b>좌표계 변환 무결성</b></td><td class="mono">EPSG:5186 → EPSG:5179 (변환 오차 0.000mm)</td><td><span style="color:var(--done); font-weight:700">합격</span></td></tr>
+              <tr><td><span style="color:var(--done)">✓</span></td><td><b>검사점 실측 정밀도</b></td><td class="mono">CP-01 RMS 2.8 mm (국가유산청 기준 5.0mm 이내)</td><td><span style="color:var(--done); font-weight:700">합격</span></td></tr>
+              <tr><td><span style="color:var(--done)">✓</span></td><td><b>정사영상 지상해상도</b></td><td class="mono">GSD 0.85 mm/px (1:20 축척 기준 1.0mm 이하)</td><td><span style="color:var(--done); font-weight:700">합격</span></td></tr>
+              <tr><td><span style="color:var(--done)">✓</span></td><td><b>CAD 도면 레이어 분리</b></td><td>AutoCAD 2018 DXF (R32, 유구선/토층선/등고선)</td><td><span style="color:var(--done); font-weight:700">합격</span></td></tr>
+              <tr><td><span style="color:var(--done)">✓</span></td><td><b>토층 실측도판 양식</b></td><td>A3 백상지 1:20 축척 표제란 및 방위/표고 기준선 완비</td><td><span style="color:var(--done); font-weight:700">합격</span></td></tr>
+              <tr><td><span style="color:var(--done)">✓</span></td><td><b>알고리즘 재현성 보증</b></td><td>카메라 보정계수, 번들조정 공분산, 해시 지문 PDF 생성</td><td><span style="color:var(--done); font-weight:700">합격</span></td></tr>
+              <tr><td><span style="color:var(--done)">✓</span></td><td><b>제출물 무결성 체크섬</b></td><td class="mono">MANIFEST.sha256 자동 서명 대기</td><td><span style="color:var(--done); font-weight:700">합격</span></td></tr>
+            </table>
+          </div>
+          
+          <!-- 제출 꾸러미 구성 목록 -->
+          <div>
+            <div style="font-size:14px; font-weight:700; margin-bottom:8px">생성될 제출 꾸러미 구성품 (압축 예상: 1.64 GB)</div>
+            <div style="background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:12px; font-size:12px">
+              <div style="font-weight:700; margin-bottom:6px">📁 광령리1_1호주거지_국가유산청제출_20261013/</div>
+              <div style="padding-left:16px; display:flex; flex-direction:column; gap:4px" class="mono">
+                <div>├── 📄 01_평면정사영상_EPSG5179.tif <span class="muted">(1.2 GB, GeoTIFF + TFW)</span></div>
+                <div>├── 📄 02_토층단면실측도_AA_1대20.dxf <span class="muted">(14.2 MB, AutoCAD R32)</span></div>
+                <div>├── 📄 03_실측도판_출력본_A3.pdf <span class="muted">(8.5 MB, 1:20 벡터 도판)</span></div>
+                <div>├── 📄 04_사진측량_처리검증보고서.pdf <span class="muted">(4.1 MB, 재현성 지문 포함)</span></div>
+                <div>├── 📄 05_고밀도점군_정규화.laz <span class="muted">(420 MB, EPSG:5179)</span></div>
+                <div>└── 📄 MANIFEST.sha256 <span class="muted">(1.2 KB, 무결성 검증 전자문서)</span></div>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+        <div class="dfoot">
+          <button class="btn">닫기 (Esc)</button>
+          <button class="btn">${ic('printer')}사전 검수 보고서 인쇄</button>
+          <span class="sp"></span>
+          <button class="btn on" style="font-weight:700">${ic('clipboard-list')}제출 꾸러미 생성 및 서명 (Ctrl+E)</button>
+        </div>
+      </div>
+      
+    </div>
+    <div class="status">
+      <span class="sent">국가유산청 규격 검수 완료 · 결함 없음 · 원클릭 패키징 대기 중</span>
+      <div class="cell"><span style="color:var(--done)">● 7개 관문 모두 통과</span></div>
+    </div>
+  </div></div>`;
+
+  $('#boards').innerHTML = h;
+}
+
+/* ----------------------------------------------------
+   보드 반응형 축소 / 실제 크기 토글 함수
+   ---------------------------------------------------- */
+function resizeBoards() {
+  for (let i = 1; i <= 5; i++) {
+    const wrap = $(`#bwrap-${i}`);
+    const board = $(`#board-${i}`);
+    if (!wrap || !board) continue;
+    if (!wrap.classList.contains('actual')) {
+      const w = wrap.clientWidth;
+      const s = w / 1920;
+      board.style.transform = `scale(${s})`;
+      wrap.style.height = `${Math.round(1040 * s)}px`;
+    } else {
+      board.style.transform = 'none';
+      wrap.style.height = '1040px';
+    }
+  }
+}
+
+function toggleBoardSize(num, actual) {
+  const wrap = $(`#bwrap-${num}`);
+  const bar = $(`#bbar-${num}`);
+  if (!wrap || !bar) continue_or_return: return;
+  const bfit = bar.querySelector('.bfit');
+  const bactual = bar.querySelector('.bactual');
+  if (actual) {
+    wrap.classList.add('actual');
+    bfit.classList.remove('on');
+    bactual.classList.add('on');
+  } else {
+    wrap.classList.remove('actual');
+    bfit.classList.add('on');
+    bactual.classList.remove('on');
+  }
+  resizeBoards();
+}
+
+function initEvents() {
+  // Look switcher (기본 모양 vs 새 모양)
+  $$('#lookSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('#lookSeg button').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      const look = btn.dataset.look;
+      document.documentElement.setAttribute('data-look', look);
+      drawSwatches();
+    });
+  });
+
+  // 촬영 거리 계산기 입력 리스너
+  ['#cSensor', '#cPx', '#cF', '#cScale', '#cOv'].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener('input', calc);
+  });
+}
+
+/* ----------------------------------------------------
+   문서 로드 시 전체 실행
+   ---------------------------------------------------- */
+window.addEventListener('DOMContentLoaded', () => {
+  drawSwatches();
+  drawOnStates();
+  const cs = $('#chipSpec');
+  if (cs) cs.innerHTML = specHTML();
+  const rd = $('#ribbonDemo');
+  if (rd) {
+    rd.innerHTML = ribbonHTML({unsaved:true, tool:'gcp'});
+    const s = rd.parentElement.clientWidth / 1920;
+    rd.style.transform = `scale(${s})`;
+    rd.parentElement.style.height = `${Math.round(118 * s)}px`;
+  }
+  drawBoards();
+  initEvents();
+  calc();
+  setTimeout(resizeBoards, 50);
+});
+
+window.addEventListener('resize', () => {
+  resizeBoards();
+  const rd = $('#ribbonDemo');
+  if (rd && rd.parentElement) {
+    const s = rd.parentElement.clientWidth / 1920;
+    rd.style.transform = `scale(${s})`;
+    rd.parentElement.style.height = `${Math.round(118 * s)}px`;
+  }
+});
+
+// Immediately invoke if DOM already parsed
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  drawSwatches();
+  drawOnStates();
+  const cs = $('#chipSpec');
+  if (cs) cs.innerHTML = specHTML();
+  const rd = $('#ribbonDemo');
+  if (rd) {
+    rd.innerHTML = ribbonHTML({unsaved:true, tool:'gcp'});
+    const s = rd.parentElement.clientWidth / 1920;
+    rd.style.transform = `scale(${s})`;
+    rd.parentElement.style.height = `${Math.round(118 * s)}px`;
+  }
+  drawBoards();
+  initEvents();
+  calc();
+  setTimeout(resizeBoards, 50);
+}
+</script>
+</body>
+</html>
