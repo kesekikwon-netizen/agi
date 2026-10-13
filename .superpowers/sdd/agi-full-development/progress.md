@@ -6,5 +6,5 @@
 - [x] Task 3: `agi-mvs` & `agi-mesh` (PatchMatch Depth Estimation, Dense Point Cloud, 3D Mesh Reconstruction) [commit 6c54f6b]
 - [x] Task 4: `agi-ortho` (Plan Orthophoto, Vertical Soil Stratigraphy Profile Slicing A-A', 10cm Contours) [commit 1f65569]
 - [x] Task 5: `agi-export` (AutoCAD DXF Exporter, GeoTIFF, and National Heritage Submission Package Generator) [commit fa27443]
-- [ ] Task 6: `agi-cli` Integration & End-to-End Pipeline Verification with Sample Archaeological Dataset
-- [ ] Task 7: Design System Validation & Strata Visual Consistency Verification
+- [x] Task 6: `agi-cli` Integration & End-to-End Pipeline Verification with Sample Archaeological Dataset [commit bf0eff5]
+- [x] Task 7: Design System Validation & Strata Visual Consistency Verification [commit 79c556a]
