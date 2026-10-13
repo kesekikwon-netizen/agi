@@ -1,0 +1,7 @@
+#!/bin/sh
+# AGI Pre-Commit Hook: Rust workspace verification
+set -e
+
+echo "[githooks] Running pre-commit validation..."
+cargo test --workspace
+echo "[githooks] Pre-commit validation passed."

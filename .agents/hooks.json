@@ -1,0 +1,17 @@
+{
+  "code-hygiene": {
+    "enabled": true,
+    "PostToolUse": [
+      {
+        "matcher": "replace_file_content|write_to_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "which rustfmt >/dev/null && git diff --name-only | grep -E '\\.rs$' | xargs -r rustfmt || true",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
