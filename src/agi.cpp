@@ -1,6 +1,5 @@
 #include "agi/agi.hpp"
 
-#include <format>
 #include <utility>
 
 namespace agi {
