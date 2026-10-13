@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/agi-core",
+    "crates/agi-features",
     "crates/agi-cli",
 ]
 resolver = "2"
